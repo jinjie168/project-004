@@ -49,7 +49,17 @@ const WORLDS=[
  {name:'Bouncy Forest',col:'#2fb98a',dk:'#1b7f5c',sky:['#d3f5df','#f4fff8'],icon:'tree'},
  {name:'Candy World',col:'#ff7eb6',dk:'#d6407f',sky:['#ffdff0','#fff8fc'],icon:'candy'},
  {name:'Crazy Factory',col:'#ffa24a',dk:'#c9651a',sky:['#dfe6ef','#f7f9fc'],icon:'gear'},
- {name:'Magic World',col:'#9b6bff',dk:'#6a3fd1',sky:['#e0d5ff','#f8f4ff'],icon:'wand'}];
+ {name:'Magic World',col:'#9b6bff',dk:'#6a3fd1',sky:['#e0d5ff','#f8f4ff'],icon:'wand'},
+ {name:'Frozen Kingdom',col:'#6ec6ff',dk:'#2a86c9',sky:['#d8f1ff','#f5fbff'],icon:'sun'},
+ {name:'Lava Planet',col:'#ff6a3d',dk:'#b8300f',sky:['#ffd9c9','#fff3ee'],icon:'gear'},
+ {name:'Underwater World',col:'#31c6d4',dk:'#12808f',sky:['#cdf3f6','#f0fcfd'],icon:'candy'},
+ {name:'Space Adventure',col:'#6b6bd6',dk:'#3a3aa0',sky:['#d6d6f5','#f3f3ff'],icon:'wand'},
+ {name:'Toy Factory',col:'#ff5d8f',dk:'#c22a5c',sky:['#ffe0ea','#fff6f9'],icon:'gear'},
+ {name:'Magical Forest',col:'#3bbf6e',dk:'#1e8a47',sky:['#d6f5dd','#f4fff7'],icon:'tree'},
+ {name:'Candy Kingdom',col:'#ff8fd0',dk:'#d1459f',sky:['#ffe1f3','#fff7fb'],icon:'candy'},
+ {name:'Sky Kingdom',col:'#58b8ff',dk:'#2f78d6',sky:['#d9ecff','#f7fbff'],icon:'sun'},
+ {name:'Tricky Dimension',col:'#a259ff',dk:'#6a2fc9',sky:['#e8dcff','#faf6ff'],icon:'wand'},
+ {name:'Ultimate Challenge',col:'#ffb400',dk:'#b57800',sky:['#fff0c4','#fffaf0'],icon:'sun'}];
 const MAT={
  wood:{fr:.5,fs:.6,re:.3,de:.002,col:'#e2ad6e',dk:'#a5672f'},
  stone:{fr:.6,fs:.7,re:.2,de:.004,col:'#bfc4d2',dk:'#868ca4'},
@@ -111,7 +121,7 @@ function loadSave(){
     s.st=Object.assign(defSave().st,(o.st&&typeof o.st==='object')?o.st:{});
     s.daily=Object.assign(defSave().daily,(o.daily&&typeof o.daily==='object')?o.daily:{});
     ['lv','ach','wr'].forEach(k=>{if(!s[k]||typeof s[k]!=='object'||Array.isArray(s[k]))s[k]={};});
-    s.unlocked=clamp(Math.floor(+s.unlocked||1),1,50);s.coins=Math.max(0,Math.floor(+s.coins||0));
+    s.unlocked=clamp(Math.floor(+s.unlocked||1),1,200);s.coins=Math.max(0,Math.floor(+s.coins||0));
     if(!Array.isArray(s.chars)||!s.chars.includes('happy'))s.chars=['happy'];
     s.chars=s.chars.filter(x=>typeof x==='string');
     if(!s.chars.includes(s.sel))s.sel='happy';
@@ -124,7 +134,8 @@ function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(SAVE));}catc
 const totalStars=()=>Object.values(SAVE.lv).reduce((a,e)=>a+(e.stars||0),0);
 const doneCount=()=>Object.values(SAVE.lv).filter(e=>e.stars>0).length;
 const levelStars=i=>(SAVE.lv[i]&&SAVE.lv[i].stars)||0;
-const worldDone=w=>{for(let i=w*10+1;i<=w*10+10;i++)if(!levelStars(i))return false;return true;};
+const worldOf=i=>i<50?Math.floor(i/10):5+Math.floor((i-50)/15),worldStart=w=>w<5?w*10:50+(w-5)*15,worldLen=w=>w<5?10:15,blockH=w=>worldLen(w)===10?372:512,worldY=w=>{let y=0;for(let k=0;k<w;k++)y+=blockH(k);return y;},nWorlds=()=>worldOf(LEVELS.length-1)+1;
+const worldDone=w=>{for(let i=worldStart(w)+1;i<=worldStart(w)+worldLen(w);i++)if(!levelStars(i))return false;return true;};
 
 /* =====================================================================
    SECTION 4 - AUDIO SYSTEM (Web Audio, fully procedural)
@@ -461,6 +472,63 @@ LIB.spring=(sc,o)=>{
     c.save();c.translate(plat.position.x,plat.position.y);c.rotate(plat.angle);drawBlock(c,'tramp',w,16,{});c.restore();}};
 };
 Object.keys(DECO).forEach(k=>LIB[k]=(sc,o)=>({bodies:[],layer:'bg',draw(c,t){DECO[k](c,o,t);}}));
+LIB.conveyor=(sc,o)=>{const w=o.w||240,h=o.h||20,d=o.dir||1,b=Bodies.rectangle(o.x,o.y,w,h,{isStatic:true,friction:1,label:'belt'});sc.add(b);
+  return {bodies:[b],update(){const p=sc.ball.position;if(Math.abs(p.x-o.x)<w/2&&Math.abs(p.y-(o.y-h/2-BR))<6)Body.applyForce(sc.ball,p,{x:d*sc.ball.mass*.0012,y:0});},
+    draw(c,t){c.save();c.translate(o.x,o.y);rr(c,-w/2,-h/2,w,h,h/2);c.fillStyle='#59627a';c.fill();c.strokeStyle='#ffd43b';c.lineWidth=3;c.beginPath();for(let x=-w/2+10+((t*40*d)%24+24)%24;x<w/2-12;x+=24){c.moveTo(x-4*d,-4);c.lineTo(x+2*d,0);c.lineTo(x-4*d,4);}c.stroke();c.restore();}};};
+LIB.portal=(sc,o)=>{let cd=0;return {bodies:[],update(dt){cd-=dt/1000;const b=sc.ball,p=b.position;if(cd<=0&&sc.state==='running'&&Math.hypot(p.x-o.x,p.y-o.y)<34){Body.setPosition(b,{x:o.to[0],y:o.to[1]});cd=1;burst(o.to[0],o.to[1],10,['#a259ff','#fff'],140,0,.5,5,0);}},
+    draw(c,t){[[o.x,o.y,'#4dabf7'],[o.to[0],o.to[1],'#ff922b']].forEach(q=>{c.save();c.translate(q[0],q[1]);c.strokeStyle=q[2];c.lineWidth=7;c.beginPath();c.ellipse(0,0,18+Math.sin(t*5)*2,34,0,0,TAU);c.stroke();c.strokeStyle='rgba(255,255,255,.6)';c.lineWidth=2;c.stroke();c.restore();});}};};
+LIB.crack=(sc,o)=>{const w=o.w||110,h=o.h||18,b=Bodies.rectangle(o.x,o.y,w,h,{isStatic:true,friction:.02,restitution:.1,label:'crack'});sc.add(b);let tm=-1,gone=false;
+  return {bodies:[b],update(dt){const p=sc.ball.position;if(tm<0&&!gone&&Math.abs(p.x-o.x)<w/2+10&&Math.abs(p.y-(o.y-h/2-BR))<8)tm=o.delay||.45;if(tm>=0&&!gone){tm-=dt/1000;if(tm<0){gone=true;b.collisionFilter.mask=0;Body.setStatic(b,false);}}},
+    draw(c,t){c.save();c.translate(b.position.x+(tm>0&&!gone?Math.sin(t*70)*2:0),b.position.y);c.rotate(b.angle);c.globalAlpha=gone?.6:1;rr(c,-w/2,-h/2,w,h,6);c.fillStyle='#cdeeff';c.fill();c.strokeStyle='#6bb6e6';c.lineWidth=3;c.stroke();c.beginPath();c.moveTo(-w*.2,-h/2);c.lineTo(-w*.05,0);c.lineTo(-w*.2,h/2);c.moveTo(w*.15,-h/2);c.lineTo(w*.3,h*.1);c.stroke();c.restore();}};};
+LIB.icicle=(sc,o)=>{const w=o.w||34,h=o.h||70,b=Bodies.rectangle(o.x,o.y+h/2,w*.6,h,{isStatic:true,density:.004,friction:.1,label:'spike'});sc.add(b);let tm=-1,fell=false;
+  return {bodies:[b],update(dt){const p=sc.ball.position;if(tm<0&&!fell&&sc.state==='running'&&Math.abs(p.x-o.x)<(o.rng||70)&&p.y>o.y)tm=o.delay||.3;if(tm>=0&&!fell){tm-=dt/1000;if(tm<0){fell=true;Body.setStatic(b,false);}}},
+    draw(c,t){c.save();c.translate(b.position.x+(tm>0&&!fell?Math.sin(t*80)*1.5:0),b.position.y);c.rotate(b.angle);c.beginPath();c.moveTo(-w/2,-h/2);c.lineTo(w/2,-h/2);c.lineTo(0,h/2);c.closePath();const g=c.createLinearGradient(-w/2,0,w/2,0);g.addColorStop(0,'#e4f6ff');g.addColorStop(1,'#8fcdf0');c.fillStyle=g;c.fill();c.strokeStyle='#5aa9d6';c.lineWidth=3;c.lineJoin='round';c.stroke();c.restore();}};};
+LIB.vanish=(sc,o)=>{const w=o.w||110,h=o.h||18,per=o.per||2.4,b=Bodies.rectangle(o.x,o.y,w,h,{isStatic:true,friction:.4,label:'vanish'});sc.add(b);let t0=o.ph||0;
+  return {bodies:[b],update(dt){t0+=dt/1000;b.isSensor=!((t0%per)<per*.6);},
+    draw(c){const on=!b.isSensor;c.save();c.translate(o.x,o.y);c.globalAlpha=on?1:.25;rr(c,-w/2,-h/2,w,h,8);c.fillStyle='#e6dcff';c.fill();c.strokeStyle='#a68bef';c.lineWidth=3;c.setLineDash(on?[]:[6,6]);c.stroke();c.restore();}};};
+LIB.lava=(sc,o)=>{const w=o.w||200,h=o.h||40,b=Bodies.rectangle(o.x,o.y,w,h,{isStatic:true,label:'spike'});sc.add(b);
+  return {bodies:[b],draw(c,t){c.save();c.translate(o.x,o.y);rr(c,-w/2,-h/2,w,h,8);const g=c.createLinearGradient(0,-h/2,0,h/2);g.addColorStop(0,'#ffb347');g.addColorStop(1,'#e8431a');c.fillStyle=g;c.fill();c.strokeStyle='#b8300f';c.lineWidth=3;c.stroke();c.fillStyle='rgba(255,230,150,.8)';for(let i=0;i<w/40;i++){c.beginPath();c.arc(-w/2+20+i*40,Math.sin(t*3+i*2)*h*.2,4+Math.sin(t*4+i)*2,0,TAU);c.fill();}c.restore();}};};
+LIB.geyser=(sc,o)=>{const w=o.w||80,len=o.len||300,per=o.per||3;let t0=o.ph||0;const on=()=>(t0%per)<per*.45;
+  return {bodies:[],update(dt){t0+=dt/1000;const p=sc.ball.position;if(on()&&Math.abs(p.x-o.x)<w/2&&p.y<o.y&&p.y>o.y-len)Body.applyForce(sc.ball,p,{x:0,y:-sc.ball.mass*.0035});},
+    draw(c){c.save();c.translate(o.x,o.y);c.fillStyle='#8b3a1a';rr(c,-w/2,-6,w,16,6);c.fill();if(on()){const g=c.createLinearGradient(0,0,0,-len);g.addColorStop(0,'rgba(255,170,60,.75)');g.addColorStop(1,'rgba(255,170,60,0)');c.fillStyle=g;c.fillRect(-w/2+6,-len,w-12,len);}c.restore();}};};
+LIB.magnet=(sc,o)=>{const r=o.r||240,k=(o.pow||1)*(o.rep?-1:1);
+  return {bodies:[],update(){const b=sc.ball,p=b.position,dx=o.x-p.x,dy=o.y-p.y,d=Math.hypot(dx,dy);if(d<r&&d>20){const f=b.mass*.0016*k*(1-d/r)*2;Body.applyForce(b,p,{x:dx/d*f,y:dy/d*f});}},
+    draw(c,t){c.save();c.translate(o.x,o.y);c.strokeStyle='rgba(120,120,255,.25)';c.lineWidth=3;for(let i=0;i<3;i++){c.beginPath();c.arc(0,0,r*((t*.4+i/3)%1),0,TAU);c.stroke();}c.fillStyle=o.rep?'#4dabf7':'#ff6b6b';c.beginPath();c.arc(0,0,20,0,TAU);c.fill();c.fillStyle='#fff';c.font='800 24px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(o.rep?'N':'S',0,1);c.restore();}};};
+LIB.gravzone=(sc,o)=>{const w=o.w||200,h=o.h||300,d=o.dir===undefined?-1:o.dir;
+  return {bodies:[],update(){const b=sc.ball,p=b.position;if(Math.abs(p.x-o.x)<w/2&&Math.abs(p.y-o.y)<h/2)Body.applyForce(b,p,{x:0,y:b.mass*.0014*(d<0?-2:1)});},
+    draw(c,t){c.save();c.translate(o.x,o.y);c.fillStyle='rgba(162,89,255,.12)';c.fillRect(-w/2,-h/2,w,h);c.strokeStyle='rgba(162,89,255,.5)';c.lineWidth=3;c.setLineDash([8,8]);c.strokeRect(-w/2,-h/2,w,h);c.setLineDash([]);c.fillStyle='rgba(120,60,220,.6)';const sg=d<0?-1:1;for(let i=0;i<3;i++){const y=(((t*60*sg+i*h/3)%h)+h)%h-h/2;c.beginPath();c.moveTo(-10,y+8*sg);c.lineTo(0,y-8*sg);c.lineTo(10,y+8*sg);c.fill();}c.restore();}};};
+LIB.launcher=(sc,o)=>{let cd=0;const a=(o.ang||-60)*Math.PI/180,sp=o.pow||9;
+  return {bodies:[],update(dt){cd-=dt/1000;const b=sc.ball,p=b.position;if(cd<=0&&Math.hypot(p.x-o.x,p.y-o.y)<34){Body.setVelocity(b,{x:Math.cos(a)*sp,y:Math.sin(a)*sp});cd=.6;burst(o.x,o.y,8,['#ffd43b','#fff'],120,0,.4,5,0);}},
+    draw(c){c.save();c.translate(o.x,o.y);c.rotate(a);rr(c,-8,-16,46,32,10);c.fillStyle='#6f7b92';c.fill();c.strokeStyle='#44546f';c.lineWidth=3;c.stroke();c.fillStyle='#ffd43b';c.beginPath();c.moveTo(14,-8);c.lineTo(30,0);c.lineTo(14,8);c.fill();c.restore();}};};
+LIB.water=(sc,o)=>{const w=o.w||300,h=o.h||300,cx=o.cx||0,cy=o.cy||0;
+  return {bodies:[],update(){const b=sc.ball,p=b.position;if(Math.abs(p.x-o.x)<w/2&&Math.abs(p.y-o.y)<h/2){Body.applyForce(b,p,{x:cx*b.mass*.0008,y:-b.mass*.0014*(o.buoy===undefined?.85:o.buoy)+cy*b.mass*.0008});Body.setVelocity(b,{x:b.velocity.x*.985,y:b.velocity.y*.985});}},
+    draw(c,t){c.save();c.translate(o.x,o.y);c.fillStyle='rgba(80,170,230,.28)';c.fillRect(-w/2,-h/2,w,h);c.strokeStyle='rgba(255,255,255,.5)';c.lineWidth=3;c.beginPath();for(let x=-w/2;x<=w/2;x+=10)c.lineTo(x,-h/2+Math.sin(x*.05+t*2)*3);c.stroke();c.fillStyle='rgba(255,255,255,.5)';for(let i=0;i<5;i++){c.beginPath();c.arc(-w/2+(((i*53+t*20*(cx||1))%w)+w)%w,h/2-((t*30+i*61)%h),3,0,TAU);c.fill();}c.restore();}};};
+LIB.whirl=(sc,o)=>{const r=o.r||150,dr=o.dir||1;
+  return {bodies:[],update(){const b=sc.ball,p=b.position,dx=p.x-o.x,dy=p.y-o.y,d=Math.hypot(dx,dy);if(d<r&&d>8){const k=(1-d/r)*b.mass*.0022;Body.applyForce(b,p,{x:(-dy/d*dr-dx/d*.5)*k,y:(dx/d*dr-dy/d*.5)*k});}},
+    draw(c,t){c.save();c.translate(o.x,o.y);c.strokeStyle='rgba(60,150,220,.55)';c.lineWidth=5;c.lineCap='round';for(let a=0;a<3;a++){c.beginPath();for(let i=0;i<30;i++){const q=i/30,ang=t*2*dr+a*2.09+q*5*dr;c.lineTo(Math.cos(ang)*q*r,Math.sin(ang)*q*r);}c.stroke();}c.restore();}};};
+LIB.lowgrav=(sc,o)=>{const w=o.w||240,h=o.h||300,k=o.k||.75;
+  return {bodies:[],update(){const b=sc.ball,p=b.position;if(Math.abs(p.x-o.x)<w/2&&Math.abs(p.y-o.y)<h/2)Body.applyForce(b,p,{x:0,y:-b.mass*.0014*k});},
+    draw(c,t){c.save();c.translate(o.x,o.y);c.fillStyle='rgba(100,100,220,.12)';c.fillRect(-w/2,-h/2,w,h);c.strokeStyle='rgba(120,120,255,.5)';c.lineWidth=3;c.setLineDash([4,10]);c.strokeRect(-w/2,-h/2,w,h);c.setLineDash([]);c.fillStyle='rgba(255,255,255,.8)';for(let i=0;i<8;i++){c.beginPath();c.arc(-w/2+(i*67%w),-h/2+((i*41+t*10)%h),2,0,TAU);c.fill();}c.restore();}};};
+LIB.blackhole=(sc,o)=>{const r=o.r||200;
+  return {bodies:[],update(){const b=sc.ball,p=b.position,dx=o.x-p.x,dy=o.y-p.y,d=Math.hypot(dx,dy);if(d<r&&d>1){const f=b.mass*.0034*(1-d/r)*(1-d/r)+b.mass*.0003;Body.applyForce(b,p,{x:dx/d*f,y:dy/d*f});if(d<24&&sc.state==='running'){sc.vanish=true;burst(o.x,o.y,14,['#b388ff','#fff'],90,0,.8,12,0);sc.fail('spike');}}},
+    draw(c,t){c.save();c.translate(o.x,o.y);for(let i=3;i>0;i--){c.fillStyle='rgba(80,40,160,'+.12*i+')';c.beginPath();c.arc(0,0,r*.2*i,0,TAU);c.fill();}c.fillStyle='#120a2a';c.beginPath();c.arc(0,0,22,0,TAU);c.fill();c.strokeStyle='#b388ff';c.lineWidth=3;c.beginPath();c.ellipse(0,0,36,12,t*2,0,TAU);c.stroke();c.restore();}};};
+LIB.switch=(sc,o)=>{const id=o.id||'a';
+  return {bodies:[],update(){const p=sc.ball.position;if(Math.hypot(p.x-o.x,p.y-(o.y-BR))<30){sc.fl=sc.fl||{};sc.fl[id]=true;}},
+    draw(c){const on=sc.fl&&sc.fl[id];c.save();c.translate(o.x,o.y);rr(c,-26,on?-4:-10,52,on?8:14,5);c.fillStyle=on?'#51cf66':'#ff6b6b';c.fill();c.strokeStyle='#44546f';c.lineWidth=3;c.stroke();c.restore();}};};
+LIB.gate=(sc,o)=>{const id=o.id||'a',w=o.w||30,h=o.h||200,b=Bodies.rectangle(o.x,o.y,w,h,{isStatic:true,label:'gate'});sc.add(b);let tm=0;
+  return {bodies:[b],update(dt){if(sc.fl&&sc.fl[id]){tm+=dt/1000;b.isSensor=tm>=(o.delay||0);}},
+    draw(c){c.save();c.translate(o.x,o.y);c.globalAlpha=b.isSensor?.2:1;rr(c,-w/2,-h/2,w,h,6);c.fillStyle='#9aa6bf';c.fill();c.strokeStyle='#44546f';c.lineWidth=3;c.stroke();c.fillStyle='#ffd43b';for(let y=-h/2+14;y<h/2-8;y+=26)c.fillRect(-w/2+4,y,w-8,8);c.restore();}};};
+LIB.sticky=(sc,o)=>{const w=o.w||200,h=o.h||30;
+  return {bodies:[],update(){const b=sc.ball,p=b.position;if(Math.abs(p.x-o.x)<w/2&&Math.abs(p.y-o.y)<h/2+BR)Body.setVelocity(b,{x:b.velocity.x*.9,y:b.velocity.y*.95});},
+    draw(c,t){c.save();c.translate(o.x,o.y);rr(c,-w/2,-h/2,w,h,h/2);c.fillStyle='#c97a2b';c.fill();c.strokeStyle='#8a4f12';c.lineWidth=3;c.stroke();c.fillStyle='rgba(255,210,120,.7)';for(let i=0;i<w/50;i++){c.beginPath();c.arc(-w/2+25+i*50,-h/2+4+Math.sin(t*2+i)*2,4,0,TAU);c.fill();}c.restore();}};};
+LIB.hidden=(sc,o)=>{const w=o.w||110,h=o.h||18,b=Bodies.rectangle(o.x,o.y,w,h,{isStatic:true,friction:.4,label:'hidden'});sc.add(b);
+  return {bodies:[b],draw(c){const d=Math.hypot(sc.ball.position.x-o.x,sc.ball.position.y-o.y);c.save();c.translate(o.x,o.y);c.globalAlpha=d<110?.9:.1;rr(c,-w/2,-h/2,w,h,8);c.fillStyle='#d6c7ff';c.fill();c.strokeStyle='#9a7be0';c.lineWidth=3;c.stroke();c.restore();}};};
+LIB.timefreeze=(sc,o)=>{const r=o.r||60;let tm=-1,cd=0,sv=null;
+  return {bodies:[],update(dt){cd-=dt/1000;const b=sc.ball,p=b.position;if(tm<0&&cd<=0&&sc.state==='running'&&Math.hypot(p.x-o.x,p.y-o.y)<r){tm=o.t||1.2;sv={x:b.velocity.x,y:b.velocity.y};Body.setStatic(b,true);}if(tm>=0){sc.idleT=0;tm-=dt/1000;if(tm<0){Body.setStatic(b,false);Body.setVelocity(b,sv);cd=1.5;}}},
+    draw(c,t){c.save();c.translate(o.x,o.y);c.strokeStyle='rgba(80,200,230,.7)';c.lineWidth=4;c.beginPath();c.arc(0,0,r*.6,0,TAU);c.stroke();c.beginPath();c.moveTo(0,0);c.lineTo(Math.sin(t*3)*r*.4,-Math.cos(t*3)*r*.4);c.moveTo(0,0);c.lineTo(0,-r*.3);c.stroke();c.setLineDash([6,8]);c.beginPath();c.arc(0,0,r,0,TAU);c.stroke();c.restore();}};};
+LIB.rewind=(sc,o)=>{const r=o.r||50,hist=[];let cd=0;
+  return {bodies:[],update(dt){cd-=dt/1000;const b=sc.ball,p=b.position;hist.push([p.x,p.y]);if(hist.length>180)hist.shift();if(cd<=0&&sc.state==='running'&&Math.hypot(p.x-o.x,p.y-o.y)<r){const q=hist[0];Body.setPosition(b,{x:q[0],y:q[1]});Body.setVelocity(b,{x:0,y:0});cd=2;hist.length=0;burst(q[0],q[1],10,['#ff922b','#fff'],120,0,.5,5,0);}},
+    draw(c,t){c.save();c.translate(o.x,o.y);c.strokeStyle='rgba(255,146,43,.8)';c.lineWidth=4;c.beginPath();c.arc(0,0,r*.6,.6,TAU-.6);c.stroke();c.fillStyle='rgba(255,146,43,.8)';c.beginPath();c.moveTo(-r*.6*Math.cos(.6)-6,-r*.6*Math.sin(.6)-10);c.lineTo(-r*.6*Math.cos(.6)+8,-r*.6*Math.sin(.6)-2);c.lineTo(-r*.6*Math.cos(.6)-4,-r*.6*Math.sin(.6)+8);c.fill();c.setLineDash([6,8]);c.beginPath();c.arc(0,0,r,0,TAU);c.stroke();c.restore();}};};
 const TYPE_DEFAULTS={ground:{w:300,h:100},grass:{w:200,h:100},stone:{w:160,h:60},wood:{w:160,h:24},wall:{w:50,h:300},pillar:{w:70,h:200},float:{w:150,h:28},plank:{w:160,h:16},
   rubber:{w:160,h:18},metal:{w:200,h:16},ice:{w:200,h:18},glass:{w:160,h:16},tramp:{w:150,h:22},rope:{len:200,end:'plank',w:140},chain:{len:200,end:'ball'},spring:{w:150,len:70},swing:{w:160,len:120},
   spike:{w:120,h:28},mover:{w:150,h:20,dx:120,dy:0,sp:.25},rotor:{w:220,h:18,sp:1.5},pendulum:{len:200,r:26,a0:50},fan:{dir:-90,len:220,w:110,pw:2.2},bumper:{r:28},fallblock:{w:70,h:70,delay:.5},
@@ -742,7 +810,7 @@ const LEVELS=[];
 function LV(name,tip,ball,P,objs,pens,sol,ink){
   const idx=LEVELS.length;let si=0;(sol||[]).forEach(s=>{si+=polyLen(s.pts)*PEN[s.pen].mult;});si=Math.max(si,260);
   const r10=v=>Math.round(v/10)*10;
-  LEVELS.push({name,tip,world:Math.floor(idx/10),ball,target:P.target,objs:P.objs.concat(objs||[]),pens:['rigid'],sol:(sol||[]).map(x=>({pen:'rigid',pts:x.pts})),ink:ink||[Math.max(600,r10(si*2.6)),r10(si*1.8),r10(si*1.3)]});
+  LEVELS.push({name,tip,world:worldOf(idx),ball,target:P.target,objs:P.objs.concat(objs||[]),pens:['rigid'],sol:(sol||[]).map(x=>({pen:'rigid',pts:x.pts})),ink:ink||[Math.max(600,r10(si*2.6)),r10(si*1.8),r10(si*1.3)]});
 }
 /* ---------- WORLD 1 : HAPPY LAND (gravity, rolling, drawing, slopes, simple containers) ---------- */
 LV('Hello, Ball!','Draw a ramp under the ball, then lift your finger. The ball rolls!',[130,330],pit('bucket',600,690),[],P1,[ln('fixed',[100,400],[230,510],[400,650])]);
@@ -829,6 +897,172 @@ LV('Sliding Platforms','Platforms glide side to side over the spikes. Cross them
 LV('Grand Finale','The ultimate test. Use every trick!',[50,200],pit('magic',600,690,{s:.85}),
   [S('stone',200,0,60,260),C('pendulum',420,200,{len:190,r:26,a0:40}),S('spike',300,662,260,28),C('bumper',650,450,{r:26})],P4,
   [ln('fixed',[50,260],[170,340],[260,410],[340,470],[420,490],[520,500],[570,540],[600,610])],[620,420,300]);
+
+
+/* ---- WORLD 6: FROZEN KINGDOM (levels 51-65) ---- */
+LV('First Frost','Ice has almost no friction. Even a tiny slope sends the ball sliding!',[90,300],pit('bucket',610,690),[R('ice',250,520,380,18,8)],P4,[ln('fixed',[70,380],[180,470],[300,540])]);
+LV('Icicle Alley','Icicles drop when you pass under them. Be fast!',[100,500],pit('bucket',620,690,{xl:230}),[S('grass',0,560,230,400),C('icicle',320,430),C('icicle',420,430),C('icicle',520,430)],P4,[ln('fixed',[110,560],[230,640],[330,688])]);
+LV('Crack Bridge','Cracked ice breaks under the ball. Do not stop on it!',[90,380],pit('bucket',620,690,{xl:470}),[S('grass',0,440,200,350),S('stone',200,790,270,170),S('spike',200,762,270,28),C('crack',270,470,{w:100}),C('crack',390,500,{w:100})],P4,[ln('fixed',[100,440],[230,470],[330,495],[470,560])]);
+LV('Headwind','A fan blows against you. Build up speed on the ice!',[80,220],pit('bucket',610,690),[R('ice',250,480,420,18,12),C('fan',650,560,{dir:180,len:380,w:150,pw:1.5})],P4,[ln('fixed',[60,300],[200,400],[330,480],[440,560])]);
+LV('Portal Peak','Enter the blue portal and leave through the orange one!',[100,200],pit('bucket',620,690),[S('wall',350,360,40,330),C('portal',250,640,{to:[500,640]})],P4,[ln('fixed',[80,280],[160,500],[250,640])]);
+LV('Conveyor Climb','The belt pushes you back. Roll fast or bridge over it!',[90,200],pit('bucket',630,690,{xl:510}),[S('grass',0,670,250,290),C('conveyor',380,680,{w:260,h:20,dir:-1})],P4,[ln('fixed',[70,300],[180,500],[260,640])]);
+LV('Vanishing Steps','These platforms blink in and out. Time your roll!',[70,380],pit('bucket',640,690,{xl:500}),[S('grass',0,440,140,350),S('stone',0,790,500,170),S('spike',0,762,500,28),C('vanish',250,470,{w:120,per:2.6,ph:0}),C('vanish',400,540,{w:120,per:2.6,ph:1.3}),C('vanish',540,600,{w:110,per:2.6,ph:0})],P4,[ln('fixed',[90,440],[250,470],[400,540],[540,600])]);
+LV('Pendulum Push','Let the pendulum knock the ball off the ice shelf!',[230,440],pit('bucket',620,690),[R('ice',230,480,200,18,0),C('pendulum',110,170,{len:270,r:30,a0:-55}),S('spike',380,662,130,28)],P4,[ln('fixed',[330,480],[450,560],[520,640])]);
+LV('Cold Drop','Cracks fall away one by one. Catch the ball at the bottom!',[370,120],pit('basket',620,690),[S('wall',280,150,40,540),S('wall',420,150,40,420),C('crack',370,330,{w:90,delay:.4}),C('crack',370,480,{w:90,delay:.4})],P4,[ln('fixed',[420,688],[330,600])]);
+LV('Rink Bank','Slide on the ice and bank the ball off the rubber wall!',[200,200],pit('bucket',560,690,{xl:300}),[R('ice',260,430,320,18,-10),R('rubber',60,520,24,300,0)],P4,[ln('fixed',[110,330],[200,460],[310,600])]);
+LV('Snow Slalom','Skip over the snow pillars on the long icy slope.',[100,300],pit('bucket',630,690),[R('ice',360,520,640,18,14),S('pillar',250,410,36,95),S('pillar',420,455,36,95)],P4,[ln('fixed',[60,360],[200,430],[350,440],[480,560])]);
+LV('Portal Loop','Pop out high above the belt and drop into the bucket!',[100,200],pit('bucket',600,690),[S('wall',360,300,40,390),C('portal',300,640,{to:[560,330]}),C('conveyor',480,680,{w:200,h:20,dir:-1})],P4,[ln('fixed',[70,280],[180,480],[300,640])]);
+LV('Crystal Gate','Icicles above, spikes below. Cross the blinking bridge!',[90,500],pit('chest',620,690,{xl:520}),[S('grass',0,560,180,400),C('icicle',300,380),C('icicle',420,380),C('vanish',330,520,{w:90,per:2.4,ph:0}),C('vanish',470,520,{w:90,per:2.4,ph:1.2}),S('spike',200,662,320,28)],P4,[ln('fixed',[100,560],[330,520],[470,520],[560,600])]);
+LV('Blizzard','Two winds push the ball in opposite directions!',[60,250],pit('cup',610,690),[R('ice',300,520,300,18,-8),C('fan',20,420,{dir:0,len:300,w:150,pw:1.3}),C('fan',700,600,{dir:180,len:300,w:150,pw:1.3})],P4,[ln('fixed',[50,330],[200,440],[330,500],[450,540],[560,640])]);
+LV('Frost King','Portals, ice, cracks and icicles: the Frozen Kingdom finale!',[80,200],pit('magic',640,690),[S('wall',250,380,40,310),C('portal',150,640,{to:[330,300]}),R('ice',460,420,260,18,12),C('icicle',560,500),C('crack',600,560,{w:90}),C('conveyor',470,680,{w:160,h:20,dir:-1}),S('spike',360,662,60,28)],P4,[ln('fixed',[60,280],[120,480],[150,640])]);
+
+/* ---- WORLD 7: LAVA PLANET (levels 66-80) ---- */
+LV('Lava Moat','Lava is deadly, just like spikes. Bridge the moat!',[90,300],pit('bucket',630,690,{xl:500}),[S('grass',0,560,190,400),S('stone',190,790,310,170),C('lava',345,762,310,28)],P4,[ln('fixed',[100,560],[300,600],[420,640],[500,688])]);
+LV('Geyser Lift','The geyser erupts in bursts. Ride it up!',[80,560],pit('bucket',620,420,{lt:690}),[S('grass',0,620,200,340),S('stone',200,700,260,260),C('geyser',330,700,{w:90,len:340,per:3})],P4,[ln('fixed',[350,420],[450,430],[540,440])]);
+LV('Magnet Pull','The magnet pulls the ball over the lava.',[90,300],pit('bucket',630,690,{xl:500}),[S('stone',0,790,500,170),C('lava',250,762,500,28),C('magnet',380,420,{r:280,pow:1})],P4,[ln('fixed',[70,360],[160,420],[240,470])]);
+LV('Repulsor','The north-pole magnet pushes the ball up and over the wall.',[90,300],pit('bucket',630,690),[S('wall',330,430,40,260),C('magnet',350,690,{r:260,rep:1,pow:1.2})],P4,[ln('fixed',[60,380],[200,500],[300,640])]);
+LV('Flip Zone','Gravity flips inside the purple field!',[150,300],pit('bucket',630,330,{lt:690}),[C('gravzone',380,520,{w:160,h:420,dir:-1})],P4,[ln('fixed',[100,420],[250,600],[330,688])]);
+LV('Cannon Run','Roll onto the cannon pad and fly over the lava lake!',[90,300],pit('bucket',640,690,{xl:540}),[S('grass',0,620,260,340),C('launcher',150,610,{ang:-50,pow:9}),S('stone',260,790,280,170),C('lava',400,762,280,28)],P4,[ln('fixed',[80,380],[150,520],[170,600])]);
+LV('Lava Lift','Ride the platforms across the lava!',[70,420],pit('bucket',640,690,{xl:540}),[S('grass',0,480,150,480),S('stone',150,790,390,170),C('lava',345,762,390,28),mv(280,560,120,20,0,90,.3),mv(440,520,120,20,0,-90,.3,1)],P4,[ln('fixed',[100,480],[280,520],[440,540],[540,600])]);
+LV('Lava Pinball','Bumpers bounce the ball everywhere. The lava floor is waiting!',[360,120],pit('bucket',110,690,{side:'L'}),[C('bumper',260,300,{r:30}),C('bumper',460,300,{r:30}),C('bumper',360,440,{r:30}),C('lava',520,740,400,50)],P4,[ln('fixed',[300,520],[200,600],[130,660])]);
+LV('Double Geyser','Two geysers, two lifts. Mind their rhythm!',[70,560],pit('bucket',640,330,{lt:690}),[S('grass',0,620,170,340),S('stone',170,700,330,260),C('geyser',260,700,{w:80,len:260,per:3,ph:0}),C('geyser',430,700,{w:80,len:330,per:3,ph:1.5})],P4,[ln('fixed',[270,440],[350,420],[440,400])]);
+LV('Magnet Crane','Attract with one magnet, repel with the other!',[90,250],pit('bucket',630,690),[S('wall',360,380,40,310),C('magnet',300,300,{r:240}),C('magnet',460,500,{r:220,rep:1})],P4,[ln('fixed',[70,320],[170,420],[260,480])]);
+LV('Rotor Lava','Hop across the spinning platform. Lava below!',[90,300],pit('bucket',630,690,{xl:500}),[S('grass',0,520,170,440),S('stone',170,790,330,170),C('lava',335,762,330,28),C('rotor',330,600,{w:220,h:16,sp:1.2})],P4,[ln('fixed',[100,520],[250,580],[340,580],[480,620])]);
+LV('Gravity Ceiling','Float up, roll along the ceiling, then drop down!',[100,500],pit('bucket',620,690),[S('grass',0,560,200,400),C('gravzone',420,400,{w:320,h:560,dir:-1}),S('stone',260,120,320,40)],P4,[ln('fixed',[110,560],[230,600],[330,600])]);
+LV('Launcher Chain','Two cannons. Land in the second one!',[90,350],pit('bucket',640,690),[S('grass',0,600,230,360),C('launcher',140,590,{ang:-70,pow:8}),C('launcher',360,320,{ang:-20,pow:8}),S('wall',470,420,40,270)],P4,[ln('fixed',[80,420],[130,520],[150,590])]);
+LV('Magma Slalom','Slide down the slab and avoid the lava pools!',[90,200],pit('bucket',630,690),[R('stone',330,500,600,20,14),C('lava',200,447,70,24),C('lava',380,495,70,24),C('lava',520,530,70,24)],P4,[ln('fixed',[70,260],[170,420],[290,460])]);
+LV('Volcano','Geysers, magnets and lava: the Lava Planet finale!',[70,200],pit('magic',640,690,{xl:520}),[S('grass',0,520,160,440),S('stone',160,790,360,170),C('lava',340,762,360,28),C('geyser',260,700,{w:80,len:300,per:3}),C('magnet',430,380,{r:240}),C('launcher',120,510,{ang:-60,pow:8})],P4,[ln('fixed',[60,260],[110,400],[130,500])]);
+/* ---- WORLD 8: UNDERWATER WORLD (levels 81-95) ---- */
+LV('Splash Zone','Water slows the ball and lets it float.',[90,250],pit('bucket',630,690),[C('water',340,610,{w:340,h:160,buoy:.9})],P4,[ln('fixed',[70,330],[200,480],[330,640])]);
+LV('Float Up','Strong buoyancy lifts the ball to the surface.',[360,150],pit('bucket',630,360,{lt:690}),[C('water',360,520,{w:200,h:380,buoy:1.7})],P4,[ln('fixed',[330,330],[440,350],[520,360])]);
+LV('River Current','A strong current carries the ball. Steer it clear of the spikes!',[80,420],pit('bucket',630,690),[C('water',340,560,{w:560,h:220,cx:2.5,buoy:.95}),S('spike',300,662,100,28)],P4,[ln('fixed',[60,480],[200,560],[330,620])]);
+LV('Whirlpool','The whirlpool spins the ball around and flings it out!',[90,300],pit('bucket',630,690),[C('whirl',360,540,{r:170}),S('pillar',330,640,60,50)],P4,[ln('fixed',[70,380],[170,470],[260,520])]);
+LV('Upstream','Swim against the current! Build up speed first.',[80,220],pit('bucket',630,690),[C('water',420,600,{w:480,h:200,cx:-2.2,buoy:.9}),R('stone',200,420,300,20,12)],P4,[ln('fixed',[60,300],[160,420],[300,540])]);
+LV('Updraft Chimney','A rising current lifts the ball. Steer it out of the top!',[360,200],pit('bucket',630,400,{lt:690}),[S('wall',270,300,40,390),S('wall',450,300,40,390),C('water',360,520,{w:140,h:400,cy:-3,buoy:.9})],P4,[ln('fixed',[420,300],[500,360],[560,400])]);
+LV('Twin Whirls','Two whirlpools spin in opposite directions!',[80,250],pit('bucket',630,690),[C('whirl',260,540,{r:150,dir:1}),C('whirl',470,540,{r:150,dir:-1})],P4,[ln('fixed',[60,320],[150,420],[230,500])]);
+LV('Deep Dive','Dive under the spikes, then surface at the bucket!',[90,200],pit('bucket',640,690,{xl:540}),[S('stone',0,790,540,170),S('spike',200,762,200,28),C('water',270,640,{w:540,h:340,buoy:.5})],P4,[ln('fixed',[70,300],[160,540],[220,700])]);
+LV('Bubble Bounce','Bouncy pads in the water launch the ball upward.',[90,300],pit('bucket',630,690),[C('water',340,560,{w:520,h:300,buoy:.8}),R('tramp',280,700,140,22,0),R('rubber',470,520,24,160,0)],P4,[ln('fixed',[70,380],[200,520],[300,640])]);
+LV('Current Maze','Three currents, three directions. Read the arrows!',[360,120],pit('bucket',630,690),[S('wall',200,250,30,300),S('wall',490,250,30,300),C('water',360,330,{w:260,h:150,cx:2.5,buoy:.9}),C('water',360,500,{w:260,h:150,cx:-2.5,buoy:.9})],P4,[ln('fixed',[500,560],[540,640],[600,688])]);
+LV('Whirl and Magnet','Escape the whirlpool with a magnetic pull!',[90,300],pit('bucket',640,690,{xl:520}),[S('stone',0,790,520,170),C('lava',260,762,520,28),C('whirl',250,560,{r:150}),C('magnet',480,430,{r:260})],P4,[ln('fixed',[70,380],[170,470])]);
+LV('Torpedo','A cannon fires the ball through the water!',[90,300],pit('bucket',640,690),[S('grass',0,560,220,400),C('launcher',140,550,{ang:-25,pow:7}),C('water',450,480,{w:480,h:360,buoy:.7}),S('wall',560,430,40,260)],P4,[ln('fixed',[80,380],[130,480],[150,550])]);
+LV('Whirl Stairs','Let the whirlpool lift the ball up to the ledge!',[90,300],pit('bucket',630,440,{lt:690}),[C('whirl',300,560,{r:170}),C('water',300,560,{w:340,h:240,buoy:1.1}),S('float',420,480,120,24)],P4,[ln('fixed',[400,470],[500,450],[540,440])]);
+LV('Tide','Currents push opposite ways above and below. Pick your depth!',[80,250],pit('bucket',630,690),[C('water',340,440,{w:560,h:120,cx:2.8,buoy:.95}),C('water',340,620,{w:560,h:120,cx:-2.8,buoy:.95}),S('spike',200,662,300,28)],P4,[ln('fixed',[60,330],[200,420],[330,460])]);
+LV('Kraken','Whirlpool, currents, magnet and cannon: the underwater finale!',[80,200],pit('magic',640,690,{xl:520}),[S('grass',0,520,170,440),C('launcher',120,510,{ang:-45,pow:8}),S('stone',170,790,350,170),C('lava',345,762,350,28),C('water',345,560,{w:350,h:200,cx:1.5,buoy:.9}),C('whirl',250,600,{r:130}),C('magnet',440,400,{r:230})],P4,[ln('fixed',[60,280],[110,400],[130,500])]);
+
+/* ---- WORLD 9: SPACE ADVENTURE (levels 96-110) ---- */
+LV('Low Gravity','Gravity is weak here. The ball floats far!',[90,300],pit('bucket',630,690,{xl:500}),[S('stone',0,790,500,170),S('spike',0,762,500,28),C('lowgrav',300,520,{w:420,h:500,k:.8})],P4,[ln('fixed',[70,380],[180,480],[300,560])]);
+LV('Black Hole','Use the pull to curve around the wall. Never touch the center!',[90,200],pit('bucket',630,690),[S('wall',340,400,40,290),C('blackhole',420,300,{r:220})],P4,[ln('fixed',[60,260],[160,330],[260,380])]);
+LV('Asteroid Belt','Hop across the drifting asteroids!',[70,400],pit('bucket',640,690,{xl:540}),[S('grass',0,460,130,330),S('stone',130,790,410,170),S('spike',130,762,410,28),mv(250,500,100,24,60,0,.3),mv(380,560,100,24,-60,0,.3,1),mv(500,500,90,24,40,0,.4,.5)],P4,[ln('fixed',[90,460],[250,500],[380,560],[520,520])]);
+LV('Wormhole Jump','Dive into the wormhole and appear on the other side of the wall!',[90,200],pit('bucket',630,690),[S('wall',330,300,40,390),C('portal',200,650,{to:[480,260]}),C('lowgrav',500,500,{w:200,h:420,k:.5})],P4,[ln('fixed',[70,280],[150,520],[200,650])]);
+LV('Slingshot','Fall past the black hole and let the repulsor fling you away!',[80,250],pit('bucket',640,690),[C('blackhole',300,420,{r:200}),C('magnet',500,600,{r:220,rep:1})],P4,[ln('fixed',[60,320],[150,420],[200,520])]);
+LV('Switch Gate','Step on the switch to open the gate!',[90,250],pit('bucket',630,690),[C('switch',220,690,{id:'a'}),C('gate',420,600,{id:'a',h:180,delay:.5})],P4,[ln('fixed',[70,330],[150,520],[230,650])]);
+LV('Double Switch','Two switches open two gates. Hit them in order!',[80,230],pit('bucket',630,690),[C('switch',180,690,{id:'a'}),C('gate',300,600,{id:'a',h:180}),C('switch',400,690,{id:'b'}),C('gate',520,600,{id:'b',h:180,delay:.4})],P4,[ln('fixed',[60,300],[140,500],[220,650])]);
+LV('Gravity Lab','Float up inside the field, then roll down the other side!',[100,500],pit('bucket',630,690),[S('grass',0,560,200,400),C('gravzone',320,420,{w:140,h:520,dir:-1}),S('wall',470,300,40,390)],P4,[ln('fixed',[110,560],[230,600],[300,640])]);
+LV('Orbit Drop','A slow fall between two magnets. Steer into the far bucket!',[360,100],pit('bucket',110,690,{side:'L'}),[C('lowgrav',360,400,{w:720,h:700,k:.85}),C('magnet',200,420,{r:230,rep:1}),C('magnet',520,440,{r:230})],P4,[ln('fixed',[300,500],[200,620],[130,670])]);
+LV('Satellite','Slip between the pendulum and the black hole.',[80,220],pit('bucket',640,690),[C('pendulum',300,150,{len:240,r:26,a0:40}),C('blackhole',520,520,{r:190})],P4,[ln('fixed',[60,290],[160,400],[270,500])]);
+LV('Warp Lane','Two wormholes in a row. Follow the orange rings!',[80,200],pit('bucket',640,690),[S('wall',260,300,40,390),S('wall',460,300,40,390),C('portal',160,650,{to:[360,300]}),C('portal',360,650,{to:[560,300]})],P4,[ln('fixed',[60,280],[120,520],[160,650])]);
+LV('Moon Base','Belts and low gravity: ride the belt, then float to the bucket!',[90,300],pit('bucket',640,690,{xl:560}),[S('grass',0,560,200,400),C('conveyor',320,570,{w:240,h:20,dir:1}),C('lowgrav',500,500,{w:260,h:400,k:.85}),S('stone',440,790,120,170),S('spike',440,762,120,28)],P4,[ln('fixed',[80,360],[150,480],[200,560])]);
+LV('Comet','The cannon shoots the ball past a black hole!',[90,300],pit('bucket',640,690),[S('grass',0,580,220,380),C('launcher',130,570,{ang:-35,pow:9}),C('blackhole',420,300,{r:200})],P4,[ln('fixed',[70,380],[120,480],[140,570])]);
+LV('Gate Rush','The gate closes fast! Hit the switch and run for it.',[80,200],pit('bucket',640,690),[C('switch',190,690,{id:'a'}),C('gate',360,600,{id:'a',h:180,delay:0}),C('lava',500,762,120,28),C('blackhole',560,420,{r:170})],P4,[ln('fixed',[60,280],[130,480],[200,650])]);
+LV('Mothership','Black hole, portals, switch and low gravity: the space finale!',[70,200],pit('magic',650,690),[S('wall',230,380,40,310),C('portal',140,650,{to:[320,300]}),C('switch',420,690,{id:'a'}),C('gate',540,600,{id:'a',h:180,delay:.3}),C('blackhole',360,200,{r:170}),C('lowgrav',330,420,{w:200,h:400,k:.6})],P4,[ln('fixed',[60,280],[110,480],[140,650])]);
+/* ---- WORLD 10: TOY FACTORY (levels 111-125) ---- */
+LV('Belt Basics','Belts carry the ball. Drop it on the belt!',[90,250],pit('bucket',640,690,{xl:520}),[S('grass',0,560,200,400),C('conveyor',330,570,{w:260,h:20,dir:1}),S('wall',684,420,36,270)],P4,[ln('fixed',[70,330],[150,480],[190,556])]);
+LV('Reverse Belt','The first belt carries you away. Skip over it!',[90,250],pit('bucket',640,690),[S('grass',0,520,160,440),C('conveyor',330,690,{w:300,h:20,dir:-1})],P4,[ln('fixed',[70,330],[150,430],[260,600])]);
+LV('Piston Press','Pistons stamp down on the belt. Time your dash!',[90,250],pit('bucket',640,690,{xl:540}),[S('grass',0,560,150,400),C('conveyor',340,570,{w:380,h:20,dir:1}),mv(300,470,80,60,0,70,.4),mv(430,470,80,60,0,70,.4,1.2)],P4,[ln('fixed',[70,330],[130,480],[160,556])]);
+LV('Spring Tower','Bounce up the springy steps to the high bucket!',[80,500],pit('bucket',630,380,{lt:690}),[S('grass',0,600,180,360),R('tramp',270,680,110,20,0),R('tramp',430,560,110,20,0)],P4,[ln('fixed',[100,600],[200,640],[260,670])]);
+LV('Toy Train','A long belt, a gate and a switch. Do things in order!',[80,220],pit('bucket',650,690),[S('grass',0,520,150,440),C('conveyor',300,530,{w:300,h:20,dir:1}),C('switch',200,530,{id:'a'}),C('gate',520,600,{id:'a',h:180,delay:1})],P4,[ln('fixed',[60,300],[120,430],[160,516])]);
+LV('Gear Works','Spinning gears chew up the path. Find a gap!',[80,200],pit('bucket',640,690),[C('rotor',260,520,{w:200,h:16,sp:1.3}),C('rotor',440,420,{w:200,h:16,sp:-1.3}),C('rotor',480,620,{w:150,h:16,sp:1.6})],P4,[ln('fixed',[60,280],[150,380],[240,460])]);
+LV('Trapdoor','Trapdoors drop after one step. Keep moving!',[80,300],pit('bucket',640,690,{xl:500}),[S('grass',0,440,150,350),S('stone',150,790,350,170),S('spike',150,762,350,28),C('crack',230,470,{w:90,delay:.35}),C('crack',340,500,{w:90,delay:.35}),C('crack',440,530,{w:80,delay:.35})],P4,[ln('fixed',[90,440],[230,470],[340,500],[440,530])]);
+LV('Claw Machine','Swing past the claw and drop into the prize chute!',[80,220],pit('chest',640,690),[C('pendulum',300,140,{len:270,r:34,a0:50}),S('wall',470,420,40,270)],P4,[ln('fixed',[60,300],[160,440],[280,540])]);
+LV('Jack in the Box','Pop up! Roll onto the pad to launch to the high bucket.',[80,300],pit('bucket',620,360,{lt:690}),[S('grass',0,600,240,360),C('launcher',160,590,{ang:-75,pow:10})],P4,[ln('fixed',[60,380],[120,480],[150,590])]);
+LV('Assembly Line','Belt, switch, gate and piston in a row.',[70,200],pit('bucket',650,690),[S('grass',0,500,140,460),C('conveyor',290,510,{w:300,h:20,dir:1}),C('switch',360,510,{id:'a'}),C('gate',520,420,{id:'a',h:160,delay:.6}),mv(600,600,60,50,0,60,.5)],P4,[ln('fixed',[60,280],[110,420],[140,496])]);
+LV('Press and Run','The belt pushes you into the press. Beat it!',[90,250],pit('bucket',640,690),[S('grass',0,560,150,400),C('conveyor',360,570,{w:420,h:20,dir:-1}),mv(420,480,90,70,0,60,.5),S('wall',684,420,36,270)],P4,[ln('fixed',[70,330],[130,480],[160,556])]);
+LV('Marble Run','Zigzag slabs and a cannon at the end.',[90,150],pit('bucket',640,690),[R('stone',200,320,260,18,14),R('stone',450,480,260,18,-14),C('launcher',330,640,{ang:-40,pow:8})],P4,[ln('fixed',[330,560],[320,620],[330,640])]);
+LV('Toy Chest','Cracked lids and belts. Land softly in the chest.',[360,120],pit('chest',620,690),[S('wall',260,150,30,440),S('wall',430,150,30,300),C('crack',345,350,{w:80,delay:.3}),C('conveyor',480,690,{w:140,h:20,dir:1})],P4,[ln('fixed',[430,688],[350,600])]);
+LV('Wind-Up','Rotors lift the ball onto a moving belt.',[80,250],pit('bucket',640,690,{xl:520}),[C('rotor',200,520,{w:200,h:16,sp:1.5}),C('conveyor',400,600,{w:200,h:20,dir:1}),S('stone',0,790,520,170),S('spike',0,762,520,28)],P4,[ln('fixed',[60,330],[130,430],[200,500])]);
+LV('Toy Factory Finale','Belts, pistons, gates, springs and portals!',[70,200],pit('magic',650,690),[S('grass',0,520,140,440),C('conveyor',280,530,{w:260,h:20,dir:1}),C('switch',200,530,{id:'a'}),C('gate',470,450,{id:'a',h:160,delay:.5}),C('portal',470,640,{to:[600,300]}),mv(580,620,70,60,0,60,.5),R('tramp',350,680,100,20,0)],P4,[ln('fixed',[60,280],[110,420],[140,516])]);
+
+/* ---- WORLD 11: MAGICAL FOREST (levels 126-140) ---- */
+LV('Mushroom Glade','Bounce off the mushroom and land on the hidden ledge!',[80,300],pit('bucket',640,420,{lt:690}),[S('grass',0,600,150,360),R('tramp',330,660,110,20,0),C('hidden',480,520,{w:120})],P4,[ln('fixed',[90,600],[230,640])]);
+LV('Hidden Bridge','An invisible bridge appears when you get close.',[80,400],pit('bucket',630,690,{xl:500}),[S('grass',0,460,150,330),S('stone',150,790,350,170),S('spike',150,762,350,28),C('hidden',230,480,{w:110}),C('hidden',350,500,{w:110}),C('hidden',460,520,{w:90})],P4,[ln('fixed',[90,460],[230,480],[350,500])]);
+LV('Sticky Sap','Sap slows the ball. Build speed before the sap!',[80,200],pit('bucket',630,690),[R('stone',230,430,380,18,14),C('sticky',470,660,{w:240}),S('wall',684,430,36,260)],P4,[ln('fixed',[60,280],[200,420],[360,500])]);
+LV('Root Elevator','Ride the root up, then roll across the canopy.',[70,520],pit('bucket',630,300,{lt:690}),[S('grass',0,580,150,380),mv(250,640,110,22,0,-160,.25),S('float',430,330,150,24)],P4,[ln('fixed',[80,580],[200,610])]);
+LV('Fairy Lanterns','Follow the lantern light to the hidden step!',[80,300],pit('bucket',640,690),[S('wall',330,420,40,270),C('magnet',240,330,{r:240}),C('hidden',470,500,{w:120}),C('lowgrav',500,420,{w:260,h:400,k:.5})],P4,[ln('fixed',[60,360],[150,460])]);
+LV('Vine Swing','Swing across the gap on the vine.',[70,380],pit('bucket',640,690,{xl:520}),[S('grass',0,440,140,350),S('stone',140,790,380,170),S('spike',140,762,380,28),C('pendulum',330,200,{len:260,r:24,a0:-45})],P4,[ln('fixed',[90,440],[180,470])]);
+LV('Mossy Ice','Ice then sap. Brake in the right place!',[80,200],pit('bucket',630,690),[R('ice',200,420,300,18,12),C('sticky',430,660,{w:140}),S('spike',520,662,70,28)],P4,[ln('fixed',[60,280],[180,400],[300,470])]);
+LV('Treetop Gap','Float up the gravity vine, then glide down.',[80,520],pit('bucket',640,690),[S('grass',0,580,170,380),C('gravzone',300,420,{w:130,h:480,dir:-1}),S('float',450,330,200,24)],P4,[ln('fixed',[90,580],[190,600])]);
+LV('Firefly Magnet','Fireflies pull the ball along the spiky floor.',[80,300],pit('bucket',640,690,{xl:540}),[S('stone',0,790,540,170),S('spike',0,762,540,28),C('magnet',200,480,{r:220}),C('magnet',420,470,{r:220})],P4,[ln('fixed',[60,360],[140,440])]);
+LV('Wind Grove','Gusts push you over the floating logs.',[70,260],pit('bucket',640,690,{xl:540}),[S('stone',0,790,540,170),S('spike',0,762,540,28),C('fan',20,420,{dir:0,len:300,w:140,pw:1.4}),S('float',250,470,110,24),S('float',420,520,110,24)],P4,[ln('fixed',[60,330],[140,420])]);
+LV('Mossy Corridor','Duck under the low roof. Sap and crumbling floor inside!',[80,300],pit('bucket',640,690),[S('stone',150,430,420,40),C('sticky',350,670,{w:140,h:30}),C('crack',470,640,{w:80,delay:.4})],P4,[ln('fixed',[60,360],[150,520],[240,640])]);
+LV('Hidden Maze','Find the invisible steps up to the bucket.',[80,600],pit('bucket',640,330,{lt:690}),[S('grass',0,660,140,300),C('hidden',240,600,{w:100}),C('hidden',360,520,{w:100}),C('hidden',480,440,{w:100})],P4,[ln('fixed',[90,660],[220,640])]);
+LV('Owl Cannon','The owl cannon throws you over the hidden wall.',[80,300],pit('bucket',640,690),[S('grass',0,600,220,360),C('launcher',140,590,{ang:-55,pow:9}),C('hidden',420,300,{w:30,h:300}),S('wall',420,430,30,260)],P4,[ln('fixed',[70,380],[120,520])]);
+LV('Moving Roots','Roots slide back and forth in the sap.',[70,420],pit('bucket',640,690,{xl:540}),[S('grass',0,480,140,310),S('stone',140,790,400,170),S('spike',140,762,400,28),mv(260,520,100,22,70,0,.3),mv(400,570,100,22,-70,0,.3,1),C('sticky',330,455,{w:120,h:20})],P4,[ln('fixed',[90,480],[250,520])]);
+LV('Heart of the Forest','Portal, hidden steps, sap and a cannon: the forest finale!',[70,200],pit('magic',650,690),[S('wall',230,350,40,340),C('portal',130,650,{to:[330,300]}),C('hidden',400,420,{w:110}),C('sticky',470,660,{w:140}),C('launcher',330,290,{ang:-20,pow:7})],P4,[ln('fixed',[60,280],[110,500])]);
+/* ---- WORLD 12: CANDY KINGDOM (levels 141-155) ---- */
+LV('Syrup Lake','Syrup holds the ball. Bridge over it!',[90,300],pit('bucket',630,690),[C('sticky',340,672,{w:300,h:36})],P4,[ln('fixed',[70,380],[200,470],[320,560])]);
+LV('Gumdrop Bounce','Gumdrops bounce the ball higher each time.',[90,200],pit('bucket',630,690),[R('tramp',220,650,120,20,0),R('tramp',400,650,120,20,0),S('wall',684,430,36,260)],P4,[ln('fixed',[70,280],[150,400])]);
+LV('Licorice Belt','Two belts, two directions.',[90,250],pit('bucket',640,690,{xl:540}),[S('grass',0,500,150,460),C('conveyor',300,510,{w:150,h:20,dir:-1}),C('conveyor',460,570,{w:170,h:20,dir:1})],P4,[ln('fixed',[70,330],[130,440])]);
+LV('Jelly Wall','Rubber walls fling the ball in odd directions.',[90,250],pit('bucket',630,690),[R('rubber',350,500,30,330,0),R('rubber',480,380,24,200,0)],P4,[ln('fixed',[70,320],[220,520])]);
+LV('Peppermint Spin','Spinning peppermints guard the cup.',[80,200],pit('cup',640,690),[C('rotor',300,480,{w:200,h:16,sp:1.2}),C('rotor',480,360,{w:170,h:16,sp:-1.2})],P4,[ln('fixed',[60,280],[180,400])]);
+LV('Caramel Drip','Drips cling to the slope.',[80,200],pit('bucket',630,690),[R('stone',300,450,500,18,13),C('sticky',250,450,{w:100,h:24}),C('sticky',450,508,{w:100,h:24})],P4,[ln('fixed',[60,280],[150,380])]);
+LV('Sweet Shot','Two cannons: shoot up, then fly over the sticky floor!',[70,520],pit('bucket',640,690,{xl:500}),[S('grass',0,580,150,380),C('launcher',110,570,{ang:-80,pow:9}),C('launcher',330,250,{ang:10,pow:7}),S('stone',150,790,350,170),C('sticky',325,772,{w:300,h:36})],P4,[ln('fixed',[60,520],[110,570])]);
+LV('Sugar Rush','Ice sugar and belts together.',[80,200],pit('bucket',640,690),[R('ice',200,400,280,18,12),C('conveyor',480,600,{w:220,h:20,dir:-1})],P4,[ln('fixed',[60,280],[160,370])]);
+LV('Cupcake Tower','Bounce up, flip the switch, open the top gate.',[80,520],pit('cup',630,400,{lt:690}),[S('grass',0,580,150,380),R('tramp',260,670,110,20,0),C('switch',400,690,{id:'a'}),C('gate',540,520,{id:'a',h:140,w:28,delay:.4})],P4,[ln('fixed',[80,580],[130,620])]);
+LV('Lollipop Ladder','Float up with the gravity lift, then cross the sticky lollipop!',[70,600],pit('bucket',640,300,{lt:690}),[S('grass',0,660,140,300),C('gravzone',250,470,{w:110,h:420,dir:-1}),S('float',380,350,200,24),C('sticky',380,338,{w:140,h:24})],P4,[ln('fixed',[80,660],[180,640])]);
+LV('Chocolate River','A sweet river carries the ball.',[80,420],pit('bucket',640,690),[C('water',340,590,{w:560,h:200,cx:2.2,buoy:.95}),S('wall',470,540,30,150)],P4,[ln('fixed',[60,480],[180,560])]);
+LV('Sprinkle Storm','Bumpers like sprinkles. Count the bounces.',[360,120],pit('cup',110,690,{side:'L'}),[C('bumper',250,280,{r:26}),C('bumper',470,280,{r:26}),C('bumper',360,380,{r:26}),C('bumper',250,480,{r:26}),C('bumper',470,480,{r:26})],P4,[ln('fixed',[300,560],[200,640])]);
+LV('Candy Cannon','Fire over the syrup lake.',[80,300],pit('bucket',640,690,{xl:520}),[S('grass',0,600,200,360),C('launcher',130,590,{ang:-45,pow:9}),S('stone',200,790,320,170),C('sticky',360,772,{w:320,h:36})],P4,[ln('fixed',[60,380],[110,500])]);
+LV('Gummy Chute','Sticky gum slows the fall. The switch at the bottom opens the exit!',[360,120],pit('bucket',630,690),[S('wall',280,200,30,490),S('wall',410,200,30,350),C('sticky',345,420,{w:100,h:24}),C('switch',345,690,{id:'a'}),C('gate',425,620,{id:'a',h:120,w:24,delay:.3})],P4,[ln('fixed',[330,560],[350,640])]);
+LV('Candy Castle','Belts, syrup, rotors and gates: the candy finale!',[70,200],pit('magic',650,690),[S('grass',0,500,140,460),C('conveyor',280,510,{w:240,h:20,dir:1}),C('rotor',480,420,{w:180,h:16,sp:1.3}),C('sticky',470,668,{w:140,h:30}),C('switch',400,510,{id:'a'}),C('gate',560,600,{id:'a',h:180,delay:.4})],P4,[ln('fixed',[60,280],[110,420])]);
+/* ---- WORLD 13: SKY KINGDOM (levels 156-170) ---- */
+LV('Cloud Steps','Hop up the cloud steps.',[70,560],pit('bucket',640,320,{lt:690}),[S('grass',0,620,140,340),S('float',230,540,110,24),S('float',370,450,110,24),S('float',510,370,110,24)],P4,[ln('fixed',[80,620],[200,590])]);
+LV('Gust','A strong gust blows across the gap.',[70,300],pit('bucket',640,690,{xl:540}),[S('grass',0,460,150,330),S('stone',150,790,390,170),S('spike',150,762,390,28),C('fan',20,330,{dir:0,len:360,w:130,pw:1.6})],P4,[ln('fixed',[80,460],[150,470])]);
+LV('Thermal','A warm updraft lifts the ball to the high ledge.',[80,600],pit('bucket',640,330,{lt:690}),[S('grass',0,660,180,300),C('fan',330,700,{dir:-90,len:440,w:110,pw:2.2})],P4,[ln('fixed',[400,330],[520,340])]);
+LV('Storm Cloud','Clouds appear and vanish with the storm.',[70,420],pit('bucket',640,690,{xl:540}),[S('grass',0,480,130,310),S('stone',130,790,410,170),S('spike',130,762,410,28),C('vanish',240,500,{w:110,per:2.2,ph:0}),C('vanish',370,540,{w:110,per:2.2,ph:1.1}),C('vanish',490,500,{w:100,per:2.2,ph:.5})],P4,[ln('fixed',[80,480],[240,500])]);
+LV('Wind Rider','Winds from both sides. Ride the middle.',[70,250],pit('bucket',640,690),[C('fan',20,400,{dir:0,len:300,w:140,pw:1.3}),C('fan',700,560,{dir:180,len:300,w:140,pw:1.3}),S('float',300,500,150,24)],P4,[ln('fixed',[60,330],[200,430])]);
+LV('Sky Cannon','The cannon shoots through a gust.',[80,300],pit('bucket',640,690),[S('grass',0,600,200,360),C('launcher',130,590,{ang:-40,pow:9}),C('fan',700,450,{dir:180,len:280,w:130,pw:1.1})],P4,[ln('fixed',[60,380],[110,500])]);
+LV('Feather Fall','Low gravity and a long drop.',[80,200],pit('bucket',640,690,{xl:540}),[S('stone',0,790,540,170),S('spike',0,762,540,28),C('lowgrav',300,420,{w:600,h:700,k:.9}),S('float',280,450,120,24)],P4,[ln('fixed',[60,280],[150,400])]);
+LV('Birdie','A pendulum bird swings through the wind.',[70,250],pit('bucket',640,690),[C('pendulum',300,140,{len:300,r:30,a0:45}),C('fan',700,500,{dir:180,len:300,w:130,pw:1.1})],P4,[ln('fixed',[60,330],[180,470])]);
+LV('Rainbow Slide','Rainbow slabs and a floating gap.',[90,150],pit('bucket',640,690,{xl:520}),[R('ice',190,300,260,18,14),R('ice',450,450,220,18,14),S('stone',0,790,520,170),S('spike',0,762,520,28)],P4,[ln('fixed',[300,400],[420,520])]);
+LV('Thunder','Cloud floors crack under the thunder.',[80,350],pit('bucket',640,690,{xl:500}),[S('grass',0,420,130,370),S('stone',130,790,370,170),S('spike',130,762,370,28),C('crack',220,450,{w:90,delay:.25}),C('crack',330,470,{w:90,delay:.25}),C('crack',430,490,{w:80,delay:.25}),C('fan',340,700,{dir:-90,len:260,w:100,pw:1.1})],P4,[ln('fixed',[90,420],[220,450])]);
+LV('Zephyr','Wind portals blow the ball across.',[80,200],pit('bucket',640,690),[S('wall',320,280,40,410),C('portal',180,650,{to:[480,300]}),C('fan',560,400,{dir:90,len:260,w:130,pw:1.1})],P4,[ln('fixed',[60,280],[130,520])]);
+LV('Updraft Tower','Ride three updrafts to the top.',[70,620],pit('bucket',650,260,{lt:690}),[S('grass',0,660,130,300),C('fan',230,700,{dir:-90,len:300,w:100,pw:2.0}),C('fan',390,520,{dir:-90,len:300,w:100,pw:2.0}),S('float',300,400,100,24),S('float',460,300,110,24)],P4,[ln('fixed',[70,660],[180,640])]);
+LV('Sky Switch','Hit the switch to open the wind gate.',[80,230],pit('bucket',640,690),[C('switch',200,690,{id:'a'}),C('gate',400,600,{id:'a',h:180,delay:.4}),C('fan',700,560,{dir:180,len:300,w:130,pw:1.0})],P4,[ln('fixed',[60,300],[130,500])]);
+LV('Cloud Maze','Magnets, clouds and a long drop.',[80,200],pit('bucket',640,690,{xl:540}),[S('stone',0,790,540,170),S('spike',0,762,540,28),C('vanish',200,440,{w:110,per:2.4,ph:0}),C('vanish',340,500,{w:110,per:2.4,ph:1.2}),C('magnet',460,420,{r:220})],P4,[ln('fixed',[60,280],[150,400])]);
+LV('Sky Kingdom Finale','Wind, clouds, portals and cannons: the sky finale!',[70,200],pit('magic',650,690),[S('wall',250,330,40,360),C('portal',140,650,{to:[330,280]}),C('launcher',360,270,{ang:-20,pow:8}),C('vanish',500,440,{w:110,per:2.4,ph:0}),C('fan',700,560,{dir:180,len:300,w:130,pw:1.0})],P4,[ln('fixed',[60,280],[110,500])]);
+
+/* ---- WORLD 14: TRICKY DIMENSION (levels 171-185) ---- */
+LV('Freeze Frame','The clock bubble freezes the ball. Wait out the spinner!',[80,200],pit('bucket',640,690),[C('timefreeze',260,520,{r:70,t:1.4}),C('rotor',420,600,{w:220,h:16,sp:1.6}),S('wall',684,430,36,260)],P4,[ln('fixed',[60,280],[150,420],[230,500])]);
+LV('Second Chance','Touch the rewind ring and the ball jumps back in time.',[80,200],pit('bucket',640,690,{xl:500}),[S('stone',0,790,500,170),S('spike',0,762,500,28),C('rewind',300,560,{r:60}),R('ice',200,400,300,18,10)],P4,[ln('fixed',[60,280],[150,380])]);
+LV('Swap Gate','Freeze at the switch and the gate opens before you move.',[80,230],pit('bucket',640,690),[C('switch',180,690,{id:'a'}),C('timefreeze',180,650,{r:50,t:1}),C('gate',380,600,{id:'a',h:180,delay:.2}),S('spike',470,662,70,28)],P4,[ln('fixed',[60,300],[130,500])]);
+LV('Mirror Room','Fall in the middle, take the portal and beware the rewind ring!',[360,100],pit('bucket',630,690),[S('wall',200,300,30,390),S('wall',490,300,30,390),C('portal',300,650,{to:[580,300]}),C('rewind',400,520,{r:50})],P4,[ln('fixed',[340,300],[360,450],[320,620])]);
+LV('Zero Seconds','Low gravity, a black hole and a portal.',[80,250],pit('bucket',640,690),[C('lowgrav',300,420,{w:560,h:600,k:.8}),C('blackhole',360,300,{r:170}),C('portal',200,600,{to:[500,500]})],P4,[ln('fixed',[60,330],[140,450])]);
+LV('Time Loop','Rewind ring in front of a reverse belt.',[80,250],pit('bucket',640,690),[S('grass',0,520,150,440),C('conveyor',300,690,{w:240,h:20,dir:-1}),C('rewind',420,660,{r:50})],P4,[ln('fixed',[60,330],[140,430])]);
+LV('Phase Walk','Step on hidden and blinking tiles over lava.',[70,400],pit('bucket',640,690,{xl:500}),[S('grass',0,460,130,330),S('stone',130,790,370,170),C('lava',315,762,370,28),C('hidden',220,480,{w:100}),C('vanish',340,520,{w:100,per:2.2,ph:0}),C('hidden',450,540,{w:90})],P4,[ln('fixed',[80,460],[220,480])]);
+LV('Magnet Maze','North and south magnets guide the ball through walls.',[80,200],pit('bucket',640,690),[S('wall',270,300,36,390),S('wall',450,300,36,390),C('magnet',360,420,{r:200}),C('magnet',200,560,{r:180,rep:1})],P4,[ln('fixed',[60,280],[140,400])]);
+LV('Gravity Hall','Up columns and down columns alternate.',[80,500],pit('bucket',650,690),[S('grass',0,560,130,400),C('gravzone',250,420,{w:110,h:500,dir:-1}),C('gravzone',470,540,{w:110,h:300,dir:1}),S('float',360,300,160,24)],P4,[ln('fixed',[70,560],[170,600])]);
+LV('Echo Chamber','Cannon to cannon to bumper to bucket.',[80,300],pit('bucket',640,690),[S('grass',0,600,200,360),C('launcher',120,590,{ang:-65,pow:8}),C('launcher',330,300,{ang:-10,pow:8}),C('bumper',520,420,{r:28})],P4,[ln('fixed',[60,380],[110,500])]);
+LV('Stasis Bridge','Freeze on the cracking bridge. Do not wait too long!',[80,300],pit('bucket',640,690,{xl:500}),[S('grass',0,440,130,350),S('stone',130,790,370,170),S('spike',130,762,370,28),C('crack',230,470,{w:90,delay:.9}),C('timefreeze',230,440,{r:40,t:.6}),C('crack',350,490,{w:90,delay:.6}),C('rotor',420,430,{w:140,h:14,sp:1.4})],P4,[ln('fixed',[90,440],[230,470])]);
+LV('Whirl Warp','Whirlpool, portal and sap in one room.',[80,250],pit('bucket',640,690),[C('whirl',250,480,{r:150}),C('portal',360,620,{to:[520,300]}),C('sticky',560,660,{w:120,h:30})],P4,[ln('fixed',[60,330],[150,430])]);
+LV('Delay Line','Three switches, three gates, three delays.',[70,230],pit('bucket',660,690),[C('switch',130,690,{id:'a'}),C('gate',230,600,{id:'a',h:180,delay:1}),C('switch',330,690,{id:'b'}),C('gate',430,600,{id:'b',h:180,delay:.5}),C('switch',530,690,{id:'c'}),C('gate',590,600,{id:'c',h:180,delay:.3})],P4,[ln('fixed',[60,300],[100,500])]);
+LV('Piston Gauntlet','Three pistons over a belt. Learn the rhythm.',[80,250],pit('bucket',650,690,{xl:540}),[S('grass',0,560,140,400),C('conveyor',350,570,{w:420,h:20,dir:1}),mv(260,470,70,70,0,70,.5),mv(360,470,70,70,0,70,.5,1),mv(460,470,70,70,0,70,.5,2)],P4,[ln('fixed',[60,330],[120,480])]);
+LV('Tricky Finale','Freeze, rewind, portals and gates: the dimension finale!',[70,200],pit('magic',650,690),[S('wall',240,330,40,360),C('portal',140,650,{to:[330,300]}),C('timefreeze',400,440,{r:60,t:1.2}),C('rotor',440,520,{w:200,h:16,sp:1.5}),C('rewind',560,640,{r:50}),C('switch',470,690,{id:'a'}),C('gate',590,600,{id:'a',h:180,delay:.4})],P4,[ln('fixed',[60,280],[110,500])]);
+/* ---- WORLD 15: ULTIMATE CHALLENGE (levels 186-200) ---- */
+LV('Pressure','Cracks, icicles and blinking clouds all at once.',[80,300],pit('bucket',650,690,{xl:520}),[S('grass',0,440,130,350),S('stone',130,790,390,170),S('spike',130,762,390,28),C('crack',220,470,{w:80,delay:.3}),C('icicle',300,350),C('vanish',340,510,{w:90,per:2,ph:0}),C('crack',450,530,{w:80,delay:.25})],P4,[ln('fixed',[90,440],[220,470])]);
+LV('Spinning Doors','Three rotors and a timed gate.',[80,200],pit('bucket',650,690),[C('rotor',240,520,{w:180,h:14,sp:1.6}),C('rotor',400,420,{w:180,h:14,sp:-1.6}),C('rotor',540,560,{w:160,h:14,sp:1.8}),C('switch',160,690,{id:'a'}),C('gate',330,600,{id:'a',h:180,delay:.3})],P4,[ln('fixed',[60,280],[120,500])]);
+LV('Black Hole Slalom','Weave between two black holes.',[80,250],pit('bucket',650,690),[C('blackhole',260,420,{r:170}),C('blackhole',480,540,{r:170})],P4,[ln('fixed',[60,330],[150,440])]);
+LV('Frozen Furnace','Ice, lava and geysers.',[70,250],pit('bucket',650,690,{xl:520}),[R('ice',170,380,260,18,12),S('stone',160,790,360,170),C('lava',340,762,360,28),C('geyser',330,700,{w:80,len:300,per:2.6}),C('geyser',440,700,{w:80,len:300,per:2.6,ph:1.3})],P4,[ln('fixed',[60,330],[140,420])]);
+LV('Lift Off','Vertical cannon, geyser and magnet to reach the top.',[70,600],pit('bucket',650,260,{lt:690}),[S('grass',0,640,180,320),C('launcher',120,630,{ang:-80,pow:9}),C('geyser',300,700,{w:80,len:300,per:2.8}),C('magnet',480,260,{r:240}),S('float',420,380,120,24)],P4,[ln('fixed',[60,640],[110,630])]);
+LV('Belt Maze','Belts in every direction between the walls.',[80,200],pit('bucket',650,690),[S('wall',200,420,30,270),S('wall',420,300,30,390),C('conveyor',320,520,{w:170,h:20,dir:-1}),C('conveyor',540,420,{w:200,h:20,dir:1}),C('conveyor',110,640,{w:190,h:20,dir:1})],P4,[ln('fixed',[60,280],[110,400])]);
+LV('Twin Maelstrom','Two whirlpools with magnets on top.',[80,250],pit('bucket',650,690),[C('whirl',250,500,{r:150,dir:1}),C('whirl',460,560,{r:150,dir:-1}),C('magnet',360,320,{r:200}),C('magnet',600,450,{r:160,rep:1})],P4,[ln('fixed',[60,330],[150,430])]);
+LV('Switch Relay','Switch to gate to belt to switch to gate.',[70,200],pit('bucket',660,690),[C('switch',150,690,{id:'a'}),C('gate',270,600,{id:'a',h:180,delay:.2}),C('conveyor',380,690,{w:140,h:20,dir:1}),C('switch',470,670,{id:'b'}),C('gate',580,600,{id:'b',h:180,delay:.8})],P4,[ln('fixed',[60,280],[100,500])]);
+LV('Time Bomb','Freeze, rewind and crack in a single drop.',[80,200],pit('bucket',650,690,{xl:500}),[S('grass',0,420,130,370),S('stone',130,790,370,170),S('spike',130,762,370,28),C('crack',230,450,{w:80,delay:.3}),C('timefreeze',340,470,{r:60,t:.8}),C('rewind',420,610,{r:50}),C('crack',420,520,{w:80,delay:.4})],P4,[ln('fixed',[90,420],[220,450])]);
+LV('Sky Dive','Fans, low gravity, clouds and a portal.',[70,200],pit('bucket',650,690,{xl:540}),[S('stone',0,790,540,170),S('spike',0,762,540,28),C('lowgrav',300,420,{w:560,h:500,k:.8}),C('fan',20,360,{dir:0,len:280,w:130,pw:1.2}),C('vanish',300,500,{w:100,per:2.2,ph:0}),C('portal',440,600,{to:[580,300]})],P4,[ln('fixed',[60,280],[150,380])]);
+LV('Pendulum Hell','Three pendulums over the whole path.',[70,220],pit('bucket',650,690),[C('pendulum',220,140,{len:260,r:28,a0:45}),C('pendulum',360,140,{len:300,r:28,a0:-45}),C('pendulum',500,140,{len:260,r:28,a0:30})],P4,[ln('fixed',[60,300],[150,420])]);
+LV('Rotor Rush','Rotors, belts and spikes in a tight corridor.',[70,230],pit('bucket',650,690),[C('conveyor',200,520,{w:200,h:20,dir:1}),C('rotor',380,440,{w:160,h:14,sp:1.8}),C('conveyor',480,600,{w:180,h:20,dir:-1}),C('rotor',560,520,{w:130,h:14,sp:-2}),S('spike',330,662,110,28)],P4,[ln('fixed',[60,300],[110,420])]);
+LV('Mirror Run','Everything flips on the other side of the portal.',[70,200],pit('bucket',110,690,{side:'L'}),[S('wall',360,280,40,410),C('portal',250,650,{to:[470,300]}),C('gravzone',540,440,{w:130,h:400,dir:-1}),C('blackhole',600,300,{r:150})],P4,[ln('fixed',[60,280],[130,520])]);
+LV('Final Gauntlet','Every danger once: cracks, lava, gates and black holes.',[70,200],pit('magic',650,690,{xl:520}),[S('grass',0,420,130,370),S('stone',130,790,390,170),C('lava',325,762,390,28),C('crack',230,450,{w:80,delay:.3}),C('blackhole',360,300,{r:150}),C('vanish',400,520,{w:90,per:2,ph:0}),C('switch',560,690,{id:'a'}),C('gate',480,600,{id:'a',h:180,delay:.4})],P4,[ln('fixed',[90,420],[220,450])]);
+LV('The Ultimate Challenge','Everything you learned. Freeze, rewind, portals, whirls, magnets and cannons!',[60,200],pit('magic',655,690),[S('wall',230,330,40,360),C('portal',130,650,{to:[330,260]}),C('timefreeze',410,420,{r:60,t:1}),C('whirl',470,540,{r:140}),C('magnet',560,300,{r:200}),C('launcher',360,250,{ang:-15,pow:8}),C('rewind',560,660,{r:45}),C('switch',420,690,{id:'a'}),C('gate',600,600,{id:'a',h:180,delay:.5})],P4,[ln('fixed',[50,280],[100,500])]);
 
 /* ---------- LEVEL VALIDATION & AUTOMATED TESTING ---------- */
 function validateDef(def){
@@ -971,7 +1205,7 @@ const ACH=[
  {id:'first',name:'First Drop',desc:'Complete your first level',reward:20,test:()=>doneCount()>=1},
  {id:'ten',name:'Rolling Along',desc:'Complete 10 levels',reward:50,test:()=>doneCount()>=10},
  {id:'t25',name:'Puzzle Pro',desc:'Complete 25 levels',reward:100,test:()=>doneCount()>=25},
- {id:'t50',name:'Emoji Master',desc:'Complete all 50 levels',reward:300,test:()=>doneCount()>=50},
+ {id:'t50',name:'Emoji Master',desc:'Complete every level',reward:300,test:()=>doneCount()>=LEVELS.length},
  {id:'w1',name:'Happy Camper',desc:'Finish World 1',reward:50,test:()=>worldDone(0)},
  {id:'w2',name:'Forest Friend',desc:'Finish World 2',reward:60,test:()=>worldDone(1)},
  {id:'w3',name:'Sweet Tooth',desc:'Finish World 3',reward:70,test:()=>worldDone(2)},
@@ -1016,7 +1250,7 @@ function enter(screen){
   G.screen=screen;G.ov=null;G.confirm=null;
   if(screen!=='play'&&screen!=='settings'&&G.scene){G.scene.dispose();G.scene=null;G.drawing=null;AU.setRoll(0);}
   if(screen!=='play'&&screen!=='settings'&&screen!=='editor')G.testing=false;
-  if(screen==='levels'){const w=Math.floor((Math.min(SAVE.unlocked,50)-1)/10);G.scroll.max=Math.max(0,5*372+20-(VH-Math.min(SAT,OY)-140));G.scroll.y=clamp(w*372,0,G.scroll.max);}
+  if(screen==='levels'){const w=worldOf(Math.min(SAVE.unlocked,LEVELS.length)-1);G.scroll.max=Math.max(0,worldY(nWorlds())+20-(VH-Math.min(SAT,OY)-140));G.scroll.y=clamp(worldY(w),0,G.scroll.max);}
   if(screen==='editor'&&window.EDI)EDI.open();else if(window.EDI&&EDI.isOpen)EDI.close();
   resize();
 }
@@ -1029,7 +1263,7 @@ function startLevel(idx,custom,daily){
   newScene();go('play');
 }
 function restartLevel(){if(G.scene&&G.scene.state!=='ready')G.restarts++;G.tipT=0;newScene();AU.pop();}
-function playNext(){if(G.custom){go('editor');return;}if(G.lvl<49){const n=G.lvl+1;if(n+1>SAVE.unlocked&&!G.devAll)go('levels');else startLevel(n);}else go('levels');}
+function playNext(){if(G.custom){go('editor');return;}if(G.lvl<LEVELS.length-1){const n=G.lvl+1;SAVE.unlocked=Math.max(SAVE.unlocked,n+1);persist();startLevel(n);}else go('levels');}
 function onWin(){
   const sc=G.scene,d=G.def,used=sc.inkUsed();AU.win();vib([60,40,90]);
   let stars=1;if(used<=d.ink[1])stars=2;if(stars===2&&used<=d.ink[2]&&G.restarts===0)stars=3;
@@ -1037,8 +1271,8 @@ function onWin(){
   if(G.testing)EDI.lastSol=sc.strokes.map(s=>({pen:s.pen,pts:s.pts.map(p=>[Math.round(p[0]),Math.round(p[1])])}));
   if(!G.custom&&!G.testing){
     const id=G.lvl+1,prev=SAVE.lv[id],first=!prev||!prev.stars;let coins=first?20+stars*10:5;
-    SAVE.lv[id]={stars:Math.max(prev?prev.stars:0,stars)};SAVE.unlocked=Math.max(SAVE.unlocked,Math.min(50,id+1));SAVE.st.wins++;SAVE.st.minInk=Math.min(SAVE.st.minInk,used/d.ink[0]);
-    const w=Math.floor((id-1)/10);if(worldDone(w)&&!SAVE.wr[w]){SAVE.wr[w]=1;coins+=100;G.bonusTxt='World complete! +100 bonus coins';toast('World Complete!',WORLDS[w].name+' +100 coins','trophy');}
+    SAVE.lv[id]={stars:Math.max(prev?prev.stars:0,stars)};SAVE.unlocked=Math.max(SAVE.unlocked,Math.min(LEVELS.length,id+1));SAVE.st.wins++;SAVE.st.minInk=Math.min(SAVE.st.minInk,used/d.ink[0]);
+    const w=worldOf(id-1);if(worldDone(w)&&!SAVE.wr[w]){SAVE.wr[w]=1;coins+=100;G.bonusTxt='World complete! +100 bonus coins';toast('World Complete!',WORLDS[w].name+' +100 coins','trophy');}
     if(G.daily&&!isDailyDone()){SAVE.daily={date:todayStr(),done:true};SAVE.st.dailyDone++;coins+=50;G.bonusTxt=(G.bonusTxt?G.bonusTxt+' | ':'')+'Daily challenge +50 coins!';}
     addCoins(coins);G.coinsGain=coins;G.newChars=checkProgress();
   }
@@ -1047,7 +1281,7 @@ function onWin(){
 }
 function onFail(r){AU.fail();vib(120);SAVE.st.fails++;persist();G.failReason=r;const b=G.scene.ball.position;if(r!=='spike')burst(clamp(b.x,20,W-20),clamp(b.y,100,H-100),10,['#8fb4ff','#fff'],160,0,.6,5,200);G.pending={type:'fail',t:.9};}
 function strokeInfo(){const sc=G.scene,d=G.def,used=sc.inkUsed()+(G.drawing?G.drawing.cost:0);let s=3;if(used>d.ink[1])s=1;else if(used>d.ink[2]||G.restarts>0)s=2;return {used,frac:clamp(1-used/d.ink[0],0,1),stars:s};}
-function skipLevel(){if(G.custom||G.testing){go('editor');return;}if(G.lvl<49){SAVE.unlocked=Math.max(SAVE.unlocked,G.lvl+2);persist();startLevel(G.lvl+1);}else go('levels');}
+function skipLevel(){if(G.custom||G.testing){go('editor');return;}if(G.lvl<LEVELS.length-1){SAVE.unlocked=Math.max(SAVE.unlocked,G.lvl+2);persist();startLevel(G.lvl+1);}else go('levels');}
 function giveHint(){const d=G.def;if(!d.sol||!d.sol.length){toast('No hint here','Try your own idea!','bulb');return;}G.hint=7;SAVE.st.hints++;AU.pop();if(G.ov){G.ov=null;if(G.scene.state==='failed')restartLevel();}}
 
 /* =====================================================================
@@ -1067,7 +1301,7 @@ function drawMenu(c){
   drawEmoji(c,360,by,100,SAVE.sel,hh>.2?'fall':'happy',Math.sin(t*2)*.3,1+sq,1-sq,t);
 }
 function drawMenuBottom(c){
-  btn(c,170,725,380,100,'PLAY',()=>{const idx=Math.min(SAVE.unlocked,50)-1;startLevel(idx);},{col:'green',icon:'play',fs:50});
+  btn(c,170,725,380,100,'PLAY',()=>{const idx=Math.min(SAVE.unlocked,LEVELS.length)-1;startLevel(idx);},{col:'green',icon:'play',fs:50});
   btn(c,60,845,285,76,'Levels',()=>go('levels'),{col:'blue',icon:'grid',fs:32});
   btn(c,375,845,285,76,'Emojis',()=>go('chars'),{col:'pink',icon:'smile',fs:32});
 }
@@ -1080,17 +1314,17 @@ function drawLevels(c){
   screenBg(c,0);
   const sc=G.scroll,y0=130-sc.y;
   c.save();c.beginPath();c.rect(0,118,W,VH-118);c.clip();UI.clip=[118,VH-Math.min(SAT,OY)];
-  for(let w=0;w<5;w++){
-    const wd=WORLDS[w],yy=y0+w*372;if(yy>VH||yy+372<118)continue;
+  for(let w=0;w<nWorlds();w++){
+    const wd=WORLDS[w],yy=y0+worldY(w);if(yy>VH||yy+blockH(w)<118)continue;
     rr(c,24,yy,672,66,24);const g=c.createLinearGradient(0,yy,0,yy+66);g.addColorStop(0,wd.col);g.addColorStop(1,wd.dk);c.fillStyle=g;c.fill();c.lineWidth=4;c.strokeStyle='#fff';c.stroke();
     T(c,'World '+(w+1)+': '+wd.name,48,yy+34,32,'#fff','left',[wd.dk,6]);
-    for(let i=0;i<10;i++){
-      const id=w*10+i+1,col=i%5,row=(i/5)|0,x=37+col*132,y=yy+82+row*140,sz=118,unlocked=id<=SAVE.unlocked||G.devAll,st=levelStars(id);
+    for(let i=0;i<worldLen(w);i++){
+      const id=worldStart(w)+i+1,col=i%5,row=(i/5)|0,x=37+col*132,y=yy+82+row*140,sz=118,unlocked=id<=SAVE.unlocked||G.devAll,st=levelStars(id);
       if(y>VH||y+sz<118)continue;const key='lv'+id;
       UI.add(x,y,sz,sz,()=>{if(unlocked)startLevel(id-1);else{AU.pop();toast('Locked','Finish level '+(id-1)+' first','lock');}},key,{});
       const down=UI.pressed&&UI.downKey===key,dy=down?4:0;
       rr(c,x,y+6,sz,sz,24);c.fillStyle=unlocked?wd.dk:'#97a3bd';c.fill();
-      rr(c,x,y+dy,sz,sz,24);const gg=c.createLinearGradient(0,y,0,y+sz);gg.addColorStop(0,unlocked?wd.col:'#dbe3f1');gg.addColorStop(1,unlocked?wd.col:'#b9c4da');c.fillStyle=gg;c.fill();c.lineWidth=4;c.strokeStyle=(id===Math.min(SAVE.unlocked,50)&&!st)?'#ffe066':'#fff';c.stroke();
+      rr(c,x,y+dy,sz,sz,24);const gg=c.createLinearGradient(0,y,0,y+sz);gg.addColorStop(0,unlocked?wd.col:'#dbe3f1');gg.addColorStop(1,unlocked?wd.col:'#b9c4da');c.fillStyle=gg;c.fill();c.lineWidth=4;c.strokeStyle=(id===Math.min(SAVE.unlocked,LEVELS.length)&&!st)?'#ffe066':'#fff';c.stroke();
       rr(c,x+8,y+dy+5,sz-16,32,14);c.fillStyle='rgba(255,255,255,.25)';c.fill();
       if(unlocked){T(c,String(id),x+sz/2,y+dy+46,46,'#fff','center',[wd.dk,8]);
         for(let s=0;s<3;s++)ICON.star(c,x+sz/2+(s-1)*28,y+dy+92,13,s<st?'#ffe066':'rgba(0,0,0,.2)');
@@ -1209,7 +1443,7 @@ function drawOverlay(c){
     if(G.bonusTxt)T(c,G.bonusTxt,360,632,20,'#d6336c');
     if(G.newChars.length)T(c,'New emoji unlocked: '+G.newChars.map(x=>x.name).join(', ')+'!',360,662,22,'#7048e8');
     if(G.testing||G.custom){btn(c,90,690,260,84,'Editor',()=>go('editor'),{col:'green',fs:34,icon:'home'});btn(c,370,690,260,84,'Replay',()=>restartLevel(),{col:'blue',fs:34,icon:'restart'});}
-    else{btn(c,90,690,540,82,G.lvl<49?'Next Level':'All Levels',()=>playNext(),{col:'green',fs:42,icon:'play'});
+    else{btn(c,90,690,540,82,G.lvl<LEVELS.length-1?'Next Level':'All Levels',()=>playNext(),{col:'green',fs:42,icon:'play'});
       btn(c,90,782,260,60,'Replay',()=>restartLevel(),{col:'blue',fs:28,icon:'restart'});btn(c,370,782,260,60,'Levels',()=>go('levels'),{col:'yellow',fs:28,icon:'grid'});}
   }else if(G.ov==='fail'){
     ribbon(c,360,210,330,'TRY AGAIN','gray');
