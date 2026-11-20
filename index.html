@@ -213,6 +213,7 @@ const CHARS=[
  {id:'rainbow',name:'Rainbow',c:['#fff','#fff'],line:'#8a63d2',eyes:'open',mouth:'grin',cheeks:0,cond:{k:'world',v:4,txt:'Finish World 4'}},
  {id:'golden',name:'Golden',c:['#fff1a0','#e8a700'],line:'#b97c00',eyes:'open',mouth:'grin',cheeks:1,crown:1,cond:{k:'wins',v:50,txt:'Complete all 50 levels'}}];
 const CMAP={};CHARS.forEach(c=>CMAP[c.id]=c);
+const PRICE={laugh:50,shock:80,cry:100,love:150,sleepy:200,angry:250,cool:300,ninja:400,robot:500,rainbow:600,golden:800};CHARS.forEach(c=>c.price=PRICE[c.id]||0);
 function charProgress(ch){
   const k=ch.cond.k,v=ch.cond.v;
   switch(k){case 'default':return [1,1];case 'wins':return [doneCount(),v];case 'stars':return [totalStars(),v];
@@ -352,6 +353,7 @@ function drawBg(c,w,t){
     case 2:c.fillStyle='rgba(255,126,182,.16)';for(let i=0;i<14;i++){c.beginPath();c.arc((i*97+30)%W,(i*131+60)%700+60,10+(i%3)*6,0,TAU);c.fill();}c.fillStyle='rgba(255,190,90,.18)';for(let i=0;i<9;i++){c.beginPath();c.arc((i*151+90)%W,(i*83+240)%700+40,8,0,TAU);c.fill();}break;
     case 3:DECO.gear(c,{x:120,y:210,s:1.5},t);DECO.gear(c,{x:610,y:430,s:1.2},t);DECO.gear(c,{x:250,y:560,s:.9},t);break;
     case 4:for(let i=0;i<26;i++){c.globalAlpha=.3+.5*Math.abs(Math.sin(t*1.3+i));c.fillStyle='#b39bff';starPath(c,(i*127+40)%W,(i*71+30)%780+20,4+(i%3)*2,2,t*.4+i);c.fill();}c.globalAlpha=1;c.fillStyle='rgba(155,107,255,.15)';c.beginPath();c.arc(560,170,70,0,TAU);c.fill();break;}
+  c.globalAlpha=.62;c.fillStyle=g;c.fillRect(0,-3000,W,H+6000);c.globalAlpha=1;
   c.strokeStyle='rgba(110,140,200,.12)';c.lineWidth=1;c.beginPath();for(let x=0;x<=W;x+=40){c.moveTo(x,-1200);c.lineTo(x,H+1200);}for(let y=-1200;y<=H+1200;y+=40){c.moveTo(0,y);c.lineTo(W,y);}c.stroke();
 }
 
@@ -584,9 +586,9 @@ class Scene{
       this.add(Bodies.rectangle(mx,my,len+e0+e1,th,{isStatic:true,angle:ang,friction:m.fr,frictionStatic:m.fs,restitution:m.re,label:'cont'}));
     }
   }
-  inGoal(p){const t=this.tgt,spec=CONT[t.type],px=(p.x-t.x)/t.s,py=(p.y-t.y)/t.s;
-    if(spec.arc){const R=spec.arc.R;return Math.hypot(px,py+R)<R-12&&py>-R*1.05;}
-    return Math.abs(px)<spec.zone[0]&&py>-spec.zone[1]&&py<-4;}
+  inGoal(p){const t=this.tgt,spec=CONT[t.type],px=(p.x-t.x)/t.s,py=(p.y-t.y)/t.s,br=BR/t.s;
+    if(spec.arc){const R=spec.arc.R,rim=-R*(1+Math.cos(spec.arc.open*Math.PI/180));return Math.hypot(px,py+R)<R-4&&py>rim+br;}
+    return Math.abs(px)<Math.abs(spec.pts[0][0])-spec.th/2&&py>spec.pts[0][1]+br&&py<-4;}
   /* ---------- simulation ---------- */
   drop(){if(this.state!=='ready')return false;this.state='running';Body.setStatic(this.ball,false);Body.setVelocity(this.ball,{x:0,y:0});this.runT=0;
     this.ents.forEach(e=>e.go&&e.go());if(this.ev.drop)this.ev.drop();return true;}
@@ -606,7 +608,7 @@ class Scene{
       this.cs.near=Math.hypot(b.position.x-this.tgt.x,b.position.y-this.tgt.y+40)<150;
       if(this.state==='running'){
         this.runT+=s;
-        if(bs.inT>.7){this.state='won';if(this.ev.win)this.ev.win();}
+        if(bs.inT>.35){this.state='won';if(this.ev.win)this.ev.win();}
         else if(b.position.y>H+160||b.position.x<-80||b.position.x>W+80)this.fail('fall');
         else if(this.runT>75)this.fail('time');
         if(spd<14&&!inside)this.idleT+=s;else this.idleT=0;
@@ -628,7 +630,7 @@ class Scene{
       if(!ball)continue;this.bs.contact=.1;{const nn=p.collision.normal;this.bs.nx=nn.x;this.bs.ny=nn.y;}if(!start)continue;
       const n=p.collision.normal,rv={x:ball.velocity.x-oth.parent.velocity.x,y:ball.velocity.y-oth.parent.velocity.y},imp=Math.abs(rv.x*n.x+rv.y*n.y)*120;
       const sup=p.collision.supports&&p.collision.supports[0]?p.collision.supports[0]:ball.position;
-      if(oth.label==='spike'&&this.state==='running'){this.fail('spike');if(this.ev.hit)this.ev.hit(imp,sup,'spike');continue;}
+      if(oth.label==='spike'&&this.state==='running'){this.vanish=true;this.fail('spike');if(this.ev.hit)this.ev.hit(imp,sup,'spike');continue;}
       const ent=oth.plugin&&oth.plugin.ent||(oth.parent.plugin&&oth.parent.plugin.ent);if(ent&&ent.onHit)ent.onHit(imp);
       const bs=this.bs;
       if(imp>140){bs.sq=Math.max(bs.sq,clamp(imp/1800,.05,.38));bs.sqa=Math.atan2(n.y,n.x);}
@@ -641,7 +643,7 @@ class Scene{
   strokeCost(pts,pen,th){return polyLen(pts)*PEN[pen].mult*thickMul(th);}
   strokeHitsBall(pts,th){const p=this.ball.position;for(let i=0;i<pts.length-1;i++)if(segDist(p.x,p.y,pts[i],pts[i+1])<BR+th/2+2)return true;return pts.length===1&&Math.hypot(pts[0][0]-p.x,pts[0][1]-p.y)<BR+th/2;}
   obst(){return this.world.bodies.filter(b=>b!==this.ball&&b.label!=='stroke'&&b.label!=='rope'&&b.label!=='bounds');}
-  blocked(x,y,th,bs){const probe=Bodies.circle(x,y,th/2+1);return Query.collides(probe,bs||this.obst()).length>0;}
+  blocked(x,y,th,bs){const bp=this.ball.position;if(Math.hypot(x-bp.x,y-bp.y)<BR+th/2+1)return true;const probe=Bodies.circle(x,y,th/2+1);return Query.collides(probe,bs||this.obst()).length>0;}
   nearStatic(x,y){const probe=Bodies.circle(x,y,10);const st=this.world.bodies.filter(b=>b.isStatic&&b!==this.ball);return Query.collides(probe,st).length>0;}
   addStroke(pen,raw,th){
     const pts=simplify(raw,2.4);if(pts.length<2)return null;
@@ -687,7 +689,7 @@ class Scene{
     this.drawBall(c,t,opt);
     drawCont(c,this,1,t);
   }
-  drawBall(c,t,opt){
+  drawBall(c,t,opt){if(this.vanish)return;
     const b=this.ball,bs=this.bs,sp=bs.spd,held=this.state==='ready';let y=b.position.y;if(held&&!opt.still)y+=Math.sin(t*3)*3;
     c.save();c.translate(b.position.x,y);
     if(!held){const k=Math.min(.18,sp/6000),a=Math.atan2(b.velocity.y,b.velocity.x);c.rotate(a);c.scale(1+k,1-k*.7);c.rotate(-a);}
@@ -743,33 +745,33 @@ function LV(name,tip,ball,P,objs,pens,sol,ink){
   LEVELS.push({name,tip,world:Math.floor(idx/10),ball,target:P.target,objs:P.objs.concat(objs||[]),pens:['rigid'],sol:(sol||[]).map(x=>({pen:'rigid',pts:x.pts})),ink:ink||[Math.max(600,r10(si*2.6)),r10(si*1.8),r10(si*1.3)]});
 }
 /* ---------- WORLD 1 : HAPPY LAND (gravity, rolling, drawing, slopes, simple containers) ---------- */
-LV('Hello, Ball!','Draw a line under the ball. It rolls as soon as you let go!',[130,330],pit('bucket',600,690),[],P1,[ln('fixed',[100,400],[230,510],[400,650])]);
-LV('Over the Hill','Roll the ball over the hill and into the bucket.',[110,250],pit('bucket',610,690),[S('pillar',290,500,70,190)],P1,[ln('fixed',[80,320],[210,400],[400,450],[560,600])]);
-LV('Mind the Gap','Draw a plank across the spikes. The Rigid Pen falls with gravity!',[40,380],pit('bucket',610,560,{xl:450}),
+LV('Hello, Ball!','Draw a ramp under the ball, then lift your finger. The ball rolls!',[130,330],pit('bucket',600,690),[],P1,[ln('fixed',[100,400],[230,510],[400,650])]);
+LV('Over the Hill','Your line is solid and falls with gravity. Let it rest on the hill.',[110,250],pit('bucket',610,690),[S('pillar',290,500,70,190)],P1,[ln('fixed',[80,320],[210,400],[400,450],[560,600])]);
+LV('Mind the Gap','Draw a plank across the spikes. It falls with gravity, so let it land on both sides!',[40,380],pit('bucket',610,560,{xl:450}),
   [R('stone',130,545,290,30,8),S('stone',0,545,235,415)].concat(gapFloor(235,450)),['rigid','fixed'],[ln('rigid',[250,535],[350,548],[470,552])]);
-LV('The Great Wall','Find a way over the tall wall.',[100,170],pit('bucket',600,690),[S('wall',320,330,60,360)],P2,[ln('fixed',[70,235],[220,265],[380,285],[470,350],[570,540],[590,600])]);
-LV('Spike Row','Spikes hurt! Jump over them.',[110,300],pit('bucket',610,690),[S('spike',280,662,200,28)],P2,[ln('fixed',[80,370],[200,450],[330,500],[470,520],[560,600])]);
-LV('Cloud Hop','Weave between the floating islands.',[110,210],pit('bucket',610,690),[S('float',250,330,150,28),S('float',440,470,120,28)],P2,[ln('fixed',[80,290],[180,370],[260,414],[400,428],[500,440],[565,446],[600,560])]);
-LV('Down the Stairs','Smooth out the stairs with one long ramp.',[90,200],pit('bucket',610,690,{xl:500,lt:640}),
+LV('The Great Wall','You cannot draw on walls. Draw a ramp that rests against it.',[100,170],pit('bucket',600,690),[S('wall',320,330,60,360)],P2,[ln('fixed',[70,235],[220,265],[380,285],[470,350],[570,540],[590,600])]);
+LV('Spike Row','Spikes destroy the ball! Build a bridge over them.',[110,300],pit('bucket',610,690),[S('spike',280,662,200,28)],P2,[ln('fixed',[80,370],[200,450],[330,500],[470,520],[560,600])]);
+LV('Cloud Hop','Floating islands are solid. Draw lines that land on them.',[110,210],pit('bucket',610,690),[S('float',250,330,150,28),S('float',440,470,120,28)],P2,[ln('fixed',[80,290],[180,370],[260,414],[400,428],[500,440],[565,446],[600,560])]);
+LV('Down the Stairs','One long line lands on the steps and makes a smooth ramp.',[90,200],pit('bucket',610,690,{xl:500,lt:640}),
   [S('stone',200,480,100,310),S('stone',300,560,100,230),S('stone',400,640,100,150),S('grass',0,790,500,170)],P2,[ln('fixed',[70,260],[190,330],[300,430],[420,520],[510,590])]);
-LV('The Little Gate','Thread the ball through the narrow gate.',[100,220],pit('bucket',600,690),[S('stone',320,160,60,320),S('stone',320,600,60,90)],P2,
+LV('The Little Gate','You cannot draw inside walls. Guide the ball through the gap.',[100,220],pit('bucket',600,690),[S('stone',320,160,60,320),S('stone',320,600,60,90)],P2,
   [ln('fixed',[70,300],[180,420],[300,548],[400,566],[520,600],[580,640])]);
 LV('Turn Around','This time the bucket is on the left!',[610,230],pit('bucket',110,690,{side:'L'}),[S('pillar',360,520,70,170)],P2,[ln('fixed',[640,300],[520,360],[400,430],[300,480],[190,560],[130,620])]);
-LV('Happy Finale','Wall, spikes and clouds. Use what you learned!',[80,200],pit('bucket',600,690),[S('wall',250,360,50,330),S('spike',400,662,120,28),S('float',470,470,120,28)],P2,
+LV('Happy Finale','Walls, spikes and clouds. Use what you learned!',[80,200],pit('bucket',600,690),[S('wall',250,360,50,330),S('spike',400,662,120,28),S('float',470,470,120,28)],P2,
   [ln('fixed',[50,260],[190,310],[300,332],[400,375],[470,425],[590,445],[620,560],[630,610])]);
 /* ---------- WORLD 2 : BOUNCY FOREST (bouncing, rubber, elevations, collisions) ---------- */
-LV('Boing!','Rubber is super bouncy. Use it!',[140,230],pit('bucket',610,690),[R('rubber',420,681,150,18,0)],P2,[ln('fixed',[100,300],[220,370],[330,430])]);
+LV('Boing!','Rubber is super bouncy. Let the ball bounce off it!',[140,230],pit('bucket',610,690),[R('rubber',420,681,150,18,0)],P2,[ln('fixed',[100,300],[220,370],[330,430])]);
 LV('Bank Shot','Bounce the ball off the rubber wall.',[150,220],pit('bucket',330,690,{side:'L'}),[R('rubber',652,500,24,380,0)],P2,[ln('fixed',[110,300],[300,370],[470,430],[590,470])]);
 LV('Trampoline Net','The trampoline catches mistakes, but the goal is across the gap.',[100,250],pit('bucket',600,600,{xl:450}),
   [S('grass',0,600,230,360),S('stone',230,790,220,170),S('spike',240,762,200,28),R('tramp',340,742,140,22,0)],P2,[ln('fixed',[100,320],[230,450],[380,510],[500,545],[560,565])]);
-LV('Bumper Alley','Bumpers kick the ball around. Stay clear!',[110,230],pit('bucket',610,690),[C('bumper',330,540,{r:30}),C('bumper',450,610,{r:30}),C('bumper',240,640,{r:26})],P2,
+LV('Bumper Alley','Bumpers kick the ball around. Draw a line that stays clear!',[110,230],pit('bucket',610,690),[C('bumper',330,540,{r:30}),C('bumper',450,610,{r:30}),C('bumper',240,640,{r:26})],P2,
   [ln('fixed',[80,300],[200,360],[320,400],[440,440],[540,520],[580,600])]);
 LV('Rubber Slalom','Go over the first rubber wall and under the second.',[100,220],pit('bucket',600,690),[S('rubber',330,430,24,260),S('rubber',460,280,24,300)],P2,
   [ln('fixed',[70,270],[200,320],[385,370],[420,500],[445,640],[520,664],[570,668])]);
 LV('Rubber Roof','Stay below the bouncy roof and above the spikes.',[100,200],pit('bucket',610,690),[S('rubber',220,330,300,18),S('spike',300,662,220,28)],P2,
   [ln('fixed',[60,260],[150,340],[220,420],[400,436],[520,452],[580,560])]);
-LV('Two-Step','Something blocks the drop. Use two ramps!',[360,230],pit('bucket',360,690,{side:'N'}),[S('stone',300,520,120,28)],P1,[ln('fixed',[400,300],[250,430]),ln('fixed',[190,510],[300,640])]);
-LV('High Ground','The bucket is on a tall pedestal. Mind the spikes below!',[100,150],pit('bucket',600,440,{xl:470}),
+LV('Two-Step','Something blocks the drop. Build two ramps that fall into place!',[360,230],pit('bucket',360,690,{side:'N'}),[S('stone',300,520,120,28)],P1,[ln('fixed',[400,300],[250,430]),ln('fixed',[190,510],[300,640])]);
+LV('High Ground','The bucket is on a tall pedestal. Let your line land on top of it.',[100,150],pit('bucket',600,440,{xl:470}),
   [S('grass',0,790,470,170),S('spike',100,762,360,28),R('rubber',280,380,120,18,0)],P2,[ln('fixed',[70,230],[250,285],[420,335],[540,390])]);
 LV('Rubber Pillars','Skip over the bouncy pillars.',[80,200],pit('bucket',600,690),[S('rubber',250,480,36,210),S('rubber',370,400,36,290),S('rubber',490,520,36,170)],P2,
   [ln('fixed',[50,250],[220,290],[400,330],[530,380],[560,540])]);
@@ -777,7 +779,7 @@ LV('Forest Finale','Wall, roof, spikes and a bumper. You can do it!',[80,200],pi
   [S('wall',230,420,40,270),S('rubber',330,330,160,18),S('spike',330,662,200,28),C('bumper',640,470,{r:26})],P2,
   [ln('fixed',[50,250],[180,340],[270,392],[340,408],[490,430],[560,545])]);
 /* ---------- WORLD 3 : CANDY WORLD (elastic surfaces, moving platforms, special containers) ---------- */
-LV('Sugar Slide','Ice is super slippery.',[140,300],pit('basket',600,690),[R('ice',240,420,260,18,18),S('wall',470,500,40,190)],P3,[ln('fixed',[372,455],[470,478],[560,560])]);
+LV('Sugar Slide','Ice is super slippery. Draw a line to guide the ball.',[140,300],pit('basket',600,690),[R('ice',240,420,260,18,18),S('wall',470,500,40,190)],P3,[ln('fixed',[372,455],[470,478],[560,560])]);
 LV('Gummy Bounce','The glass cup has a narrow mouth.',[120,230],pit('cup',600,690),[S('rubber',420,430,24,260),S('spike',250,662,160,28)],P3,
   [ln('fixed',[80,300],[220,350],[400,385],[470,400],[560,540],[590,610])]);
 LV('Candy Elevator','A moving platform sweeps the middle. Pass above it.',[100,200],pit('pot',600,690),[mv(360,520,120,20,0,130,.22)],P3,
@@ -788,10 +790,8 @@ LV('Frosting Bowl','Drop the ball into the fish bowl.',[120,230],{target:{type:'
   [S('spike',330,662,150,28),S('float',180,420,110,28)],P3,[ln('fixed',[80,300],[220,360],[380,410],[470,440],[540,450],[575,430])]);
 LV('Marshmallow Movers','Two moving platforms patrol below your path.',[100,220],pit('basket',600,690),[mv(300,520,100,18,0,100,.2),mv(450,540,100,18,0,100,.25,1.5)],P3,
   [ln('fixed',[60,250],[220,300],[400,330],[500,380],[570,540],[590,610])]);
-LV('Candy Cane Cliff','Jump off the cliff and over the spiky valley.',[90,200],pit('cup',560,690,{xl:480,lt:620}),[S('grass',0,520,200,440),S('stone',200,790,280,170),S('spike',208,762,264,28)],P3,
-  [ln('fixed',[60,260],[180,340],[260,420],[400,500],[500,560],[540,610])]);
-LV('Slippery Syrup','The floor is ice! Keep control.',[100,200],pit('pot',590,690),[R('ice',260,681,520,18,0),S('wall',300,430,40,260)],P3,
-  [ln('fixed',[60,260],[200,330],[340,375],[460,440],[540,560],[570,610])]);
+LV('Chimney Drop','Drop into the chimney. Lean a line inside so the ball rolls out the side!',[340,120],pit('cup',600,690),[S('wall',250,200,40,490),S('wall',400,200,40,360)],P3,[ln('fixed',[395,688],[300,590])]);
+LV('Ice Staircase','Icy slabs! Let a line rest on the wall and guide the ball to the pot.',[90,150],pit('pot',620,690),[R('ice',190,320,260,18,14),R('ice',420,470,200,18,14),S('wall',520,520,30,170)],P3,[ln('fixed',[500,540],[560,600],[600,688])]);
 LV('Jelly Tower','A wobbly block will fall after you drop. Be quick!',[100,200],pit('chest',600,690),[S('fallblock',395,300,70,70,{delay:1.2})],P3,
   [ln('fixed',[60,250],[200,330],[330,420],[450,455],[540,520],[580,600])]);
 LV('Sweet Finale','A sweet mix of everything!',[50,200],pit('basket',590,690,{s:.9}),[S('wall',250,380,40,310),mv(420,520,110,18,0,90,.25),S('spike',330,662,230,28),C('bumper',650,470,{r:26})],P3,
@@ -802,34 +802,30 @@ LV('Pendulum Pass','Swing! Slip under the heavy pendulum.',[100,200],pit('metal'
   [ln('fixed',[60,300],[170,430],[250,490],[400,505],[520,515],[575,560])]);
 LV('Updraft','A wind tunnel will lift anything that falls in the gap.',[100,220],pit('metal',600,520,{xl:480}),[S('grass',0,520,200,440),S('stone',200,790,280,170),C('fan',340,772,{dir:-90,len:420,w:130,pw:2.2})],P4,
   [ln('fixed',[60,250],[180,330],[260,390],[400,450],[480,490],[520,510])]);
-LV('Rope Bridge','Use the Rope Pen! Its ends stick to nearby walls.',[40,330],pit('metal',610,512,{xl:470}),slab().concat(gapFloor(262,470)),['rope','fixed','rigid'],[ln('rope',[262,512],[370,552],[480,512])]);
+LV('Piston Gate','A piston rises and falls in your way. Build a bridge over it!',[100,200],pit('metal',610,690),[mv(380,560,60,260,0,130,.3)],P4,[ln('fixed',[60,300],[200,400],[330,470],[480,520],[570,600])]);
 LV('Wrecking Ball','A heavy chain ball hangs in your way.',[100,200],pit('cup',600,690),[C('chain',400,100,{len:300,end:'ball'})],P4,
   [ln('fixed',[60,320],[190,470],[300,540],[460,555],[530,575],[590,610])]);
 LV('Spring Pit','The spring pad catches falling balls. Aim for the bowl!',[90,200],{target:{type:'bowl',x:600,y:640,s:1},objs:[S('grass',0,520,200,440),S('grass',470,640,250,320),S('stone',200,790,270,170),S('wall',684,360,36,280),C('spring',335,790,{w:140,len:70})]},
   [],P4,[ln('fixed',[60,250],[170,330],[260,400],[400,470],[500,520],[560,540],[595,525])]);
-LV('Hanging Around','Hang a platform with the Hanging Pen.',[40,330],pit('metal',610,512,{xl:470}),slab().concat(gapFloor(262,470)),['hang','fixed','rigid'],[ln('hang',[250,500],[370,516],[490,520])]);
+LV('Rotor Tower','Climb up to the bucket. A rotor spins right below your path!',[80,200],pit('metal',620,470,{lt:690}),[C('rotor',360,560,{w:200,h:16,sp:-1.4})],P4,[ln('fixed',[60,260],[200,330],[330,400],[440,430],[520,450])]);
 LV('Crosswind','A fan blows toward the left. Let it help you!',[610,220],pit('metal',110,690,{side:'L'}),[S('spike',240,662,160,28),C('fan',702,430,{dir:180,len:300,w:150,pw:1.2})],P4,
   [ln('fixed',[650,290],[520,340],[400,400],[300,450],[200,530],[130,610])]);
-LV('Rotor Maze','Two rotors spin in opposite directions.',[90,200],pit('metal',600,690),[C('rotor',300,480,{w:160,h:14,sp:1.2}),C('rotor',470,560,{w:160,h:14,sp:-1.6})],P4,
-  [ln('fixed',[60,250],[200,300],[330,330],[460,380],[540,420],[580,540],[595,610])]);
+LV('Rotor Reverse','The bucket is on the left this time. Slip past the spinners!',[630,200],pit('metal',110,690,{side:'L'}),[C('rotor',380,440,{w:170,h:14,sp:1.3}),C('rotor',240,560,{w:140,h:14,sp:-1.5}),S('pillar',470,530,60,160)],P4,[ln('fixed',[650,260],[540,330],[420,360],[300,420],[200,520],[130,610])]);
 LV('Factory Finale','Pendulum, mover and spikes together.',[80,200],pit('metal',610,690),[C('pendulum',300,190,{len:170,r:24,a0:40}),mv(500,620,100,18,0,50,.3),S('spike',330,662,180,28)],P4,
   [ln('fixed',[50,280],[140,400],[200,470],[330,490],[450,500],[540,510],[585,560],[600,620])]);
 /* ---------- WORLD 5 : MAGIC WORLD (advanced combinations, tight entrances, master challenges) ---------- */
-LV('Wizard Welcome','The magical container glows ahead.',[90,200],pit('magic',600,690),[S('wall',330,350,50,340)],P4,[ln('fixed',[60,260],[220,295],[330,315],[380,325],[470,380],[570,540],[600,610])]);
+LV('Funnel Drop','Slide through the funnel, then bridge the spikes to the glowing container!',[150,130],pit('magic',610,690),[R('stone',205,400,270,22,14),R('stone',545,400,270,22,-14),S('stone',330,620,90,70),S('spike',430,662,100,28)],P4,[ln('fixed',[410,620],[480,660],[545,688])]);
 LV('Crystal Cave','Stalactites hang from the ceiling.',[90,200],pit('magic',610,690),[S('stone',250,0,60,300),S('stone',420,0,60,380)],P4,
   [ln('fixed',[60,260],[180,350],[250,400],[330,430],[420,470],[480,500],[570,560],[600,620])]);
 LV('High Tower','The goal is on a tall tower.',[620,180],pit('magic',110,520,{side:'L'}),[S('wall',400,360,40,160)],P4,[ln('fixed',[650,250],[500,300],[420,330],[330,380],[220,430],[130,490])]);
 LV('Moonlight Bounce','Bumpers and rubber light up the night.',[100,200],pit('magic',600,690,{s:.9}),[C('bumper',400,300,{r:26}),S('rubber',360,520,24,170)],P4,
   [ln('fixed',[60,250],[200,320],[320,380],[460,440],[540,500],[580,570],[600,620])]);
-LV('Potion Pit','A tiny bowl, spikes and floating rocks.',[90,200],{target:{type:'bowl',x:560,y:690,s:1},objs:[S('grass',0,690,720,270),S('wall',684,420,36,270),S('spike',350,662,120,28),S('float',180,420,110,28)]},
-  [],P4,[ln('fixed',[60,260],[200,320],[330,360],[450,400],[510,430],[545,440],[560,430])],[560,360,260]);
-LV('Pendulum Portal','Time your path under the pendulum.',[90,200],pit('magic',600,690),[C('pendulum',330,170,{len:200,r:28,a0:45})],P4,
-  [ln('fixed',[50,300],[130,430],[200,480],[330,500],[470,510],[560,540],[595,610])]);
+LV('Bowl on a Block','The bowl sits on a stone block. Mind the spikes!',[90,200],{target:{type:'bowl',x:480,y:590,s:1},objs:[S('grass',0,690,720,270),S('stone',380,590,200,100),S('wall',684,420,36,270),S('spike',250,662,120,28)]},[],P4,[ln('fixed',[60,260],[200,330],[330,420],[400,480],[450,560])]);
+LV('Pendulum Duo','Two pendulums swing across your path.',[80,220],pit('magic',620,690,{s:.9}),[C('pendulum',250,180,{len:170,r:24,a0:45}),C('pendulum',470,150,{len:210,r:26,a0:-45})],P4,[ln('fixed',[50,300],[150,430],[240,490],[400,510],[520,520],[590,570])]);
 LV('Windy Tunnel','A fan pushes you through a low tunnel.',[90,220],pit('magic',600,690),[S('stone',200,0,420,300),C('fan',20,420,{dir:0,len:260,w:120,pw:.9})],P4,
   [ln('fixed',[50,300],[170,380],[300,420],[450,470],[560,540],[600,610])]);
-LV('Rope Cavern','A long gap needs a long rope!',[40,330],pit('magic',630,512,{xl:520}),slab().concat(gapFloor(262,520)),['rope','fixed','rigid'],[ln('rope',[262,512],[390,566],[528,512])]);
-LV('Hanging Gardens','Hang a bridge. A mover lurks below!',[40,330],pit('magic',630,520,{xl:480}),slab().concat(gapFloor(262,480)).concat([mv(370,700,100,18,0,40,.3)]),['hang','fixed','rigid'],
-  [ln('hang',[250,500],[370,516],[490,520])]);
+LV('Stepping Stones','Hop across the spiky floor on small islands.',[70,160],pit('magic',630,690,{xl:530}),[S('stone',0,790,530,170),S('spike',0,762,530,28),S('float',110,330,90,24),S('float',260,440,90,24),S('float',410,550,90,24)],P4,[ln('fixed',[60,250],[150,320],[290,425],[440,540],[520,600],[560,650])]);
+LV('Sliding Platforms','Platforms glide side to side over the spikes. Cross them!',[60,200],pit('magic',620,690,{xl:470}),[S('stone',0,790,470,170),S('spike',0,762,470,28),mv(180,520,120,20,90,0,.25),mv(330,600,120,20,-90,0,.3,1)],P4,[ln('fixed',[60,260],[200,360],[330,470],[440,560],[520,640])]);
 LV('Grand Finale','The ultimate test. Use every trick!',[50,200],pit('magic',600,690,{s:.85}),
   [S('stone',200,0,60,260),C('pendulum',420,200,{len:190,r:26,a0:40}),S('spike',300,662,260,28),C('bumper',650,450,{r:26})],P4,
   [ln('fixed',[50,260],[170,340],[260,410],[340,470],[420,490],[520,500],[570,540],[600,610])],[620,420,300]);
@@ -893,14 +889,9 @@ const ICON={
   pause:(c,x,y,s,k)=>{c.fillStyle=k;rr(c,x-s*.75,y-s*.85,s*.6,s*1.7,s*.2);c.fill();rr(c,x+s*.15,y-s*.85,s*.6,s*1.7,s*.2);c.fill();},
   skip:(c,x,y,s,k)=>{c.fillStyle=k;c.beginPath();c.moveTo(x-s*.9,y-s*.8);c.lineTo(x,y);c.lineTo(x-s*.9,y+s*.8);c.closePath();c.fill();c.beginPath();c.moveTo(x,y-s*.8);c.lineTo(x+s*.9,y);c.lineTo(x,y+s*.8);c.closePath();c.fill();},
   play:(c,x,y,s,k)=>{c.fillStyle=k;c.beginPath();c.moveTo(x-s*.55,y-s*.85);c.lineTo(x+s*.85,y);c.lineTo(x-s*.55,y+s*.85);c.closePath();c.fill();},
-  restart:(c,x,y,s)=>{c.save();c.translate(x,y);c.scale(s*.95,s*.95);c.lineCap='round';c.lineJoin='round';
-    const a0=3.35,a1=-Math.PI/2+.08,rm=.76,tk=.46,ring=(r)=>{c.beginPath();c.arc(0,0,r,a0,a1,true);},head=()=>{c.beginPath();c.moveTo(.10,-1.0);c.lineTo(-.72,-.74);c.lineTo(.10,-.22);c.closePath();};
-    c.strokeStyle='#000';c.fillStyle='#000';c.lineWidth=tk+.24;ring(rm);c.stroke();c.lineWidth=.26;head();c.stroke();head();c.fill();
-    c.strokeStyle='#0a39c4';c.lineWidth=tk;ring(rm);c.stroke();
-    c.strokeStyle='#2a86ff';c.lineWidth=tk*.66;ring(rm+.06);c.stroke();
-    c.strokeStyle='#8fd6ff';c.lineWidth=.06;ring(rm+.17);c.stroke();
-    c.fillStyle='#1e78ff';head();c.fill();c.fillStyle='#0a39c4';c.beginPath();c.moveTo(.10,-.22);c.lineTo(-.72,-.74);c.lineTo(-.55,-.5);c.lineTo(.10,-.22);c.closePath();c.fill();
-    c.restore();},
+  restart:(c,x,y,s,k)=>{c.save();c.translate(x,y);c.scale(s*.95,s*.95);c.lineCap='round';c.lineJoin='round';c.strokeStyle=k;c.fillStyle=k;
+    c.lineWidth=.46;c.beginPath();c.arc(0,0,.76,3.35,-Math.PI/2+.08,true);c.stroke();
+    c.lineWidth=.14;c.beginPath();c.moveTo(.10,-1.0);c.lineTo(-.72,-.74);c.lineTo(.10,-.22);c.closePath();c.stroke();c.fill();c.restore();},
   bulb:(c,x,y,s,k)=>{c.fillStyle=k;c.beginPath();c.arc(x,y-s*.2,s*.62,0,TAU);c.fill();rr(c,x-s*.3,y+s*.35,s*.6,s*.38,s*.12);c.fill();c.strokeStyle=k;c.lineWidth=s*.14;c.lineCap='round';c.beginPath();c.moveTo(x-s*.95,y-s*.2);c.lineTo(x-s*.75,y-s*.2);c.moveTo(x+s*.95,y-s*.2);c.lineTo(x+s*.75,y-s*.2);c.moveTo(x,y-s*1.15);c.lineTo(x,y-s*.95);c.stroke();},
   undo:(c,x,y,s,k)=>{c.strokeStyle=k;c.fillStyle=k;c.lineWidth=s*.3;c.lineCap='round';c.lineJoin='round';c.beginPath();c.moveTo(x-s*.1,y-s*.5);c.bezierCurveTo(x+s*1.0,y-s*.55,x+s*1.0,y+s*.8,x-s*.2,y+s*.75);c.stroke();c.beginPath();c.moveTo(x-s*.85,y-s*.5);c.lineTo(x-s*.05,y-s*1.05);c.lineTo(x-s*.05,y+s*.05);c.closePath();c.fill();},
   trash:(c,x,y,s,k)=>{c.fillStyle=k;c.strokeStyle=k;c.lineWidth=s*.2;c.lineCap='round';rr(c,x-s*.6,y-s*.35,s*1.2,s*1.2,s*.2);c.fill();c.beginPath();c.moveTo(x-s*.8,y-s*.5);c.lineTo(x+s*.8,y-s*.5);c.moveTo(x-s*.25,y-s*.5);c.lineTo(x-s*.25,y-s*.8);c.lineTo(x+s*.25,y-s*.8);c.lineTo(x+s*.25,y-s*.5);c.stroke();},
@@ -991,13 +982,11 @@ const ACH=[
  {id:'s100',name:'Star Hoarder',desc:'Collect 100 stars',reward:150,test:()=>totalStars()>=100},
  {id:'ink',name:'Ink Saver',desc:'Win using less than 25% of the ink',reward:40,test:()=>SAVE.st.minInk<.25},
  {id:'bounce',name:'Bouncy Ball',desc:'Bounce 200 times',reward:40,test:()=>SAVE.st.bounces>=200},
- {id:'daily',name:'Daily Driver',desc:'Complete a daily challenge',reward:40,test:()=>SAVE.st.dailyDone>=1},
  {id:'chars',name:'Collector',desc:'Unlock all 12 characters',reward:200,test:()=>SAVE.chars.length>=12}];
 function addCoins(n){SAVE.coins+=n;SAVE.st.earned=(SAVE.st.earned||0)+n;}
 function checkProgress(){
   const fresh=[];
   for(let pass=0;pass<3;pass++){let changed=false;
-    CHARS.forEach(ch=>{if(!SAVE.chars.includes(ch.id)){const p=charProgress(ch);if(p[0]>=p[1]){SAVE.chars.push(ch.id);fresh.push(ch);changed=true;toast('New character!',ch.name+' unlocked','smile');AU.unlock();}}});
     ACH.forEach(a=>{if(!SAVE.ach[a.id]&&a.test()){SAVE.ach[a.id]=1;addCoins(a.reward);changed=true;toast('Achievement: '+a.name,'+'+a.reward+' coins','trophy');AU.star(2);}});
     if(!changed)break;}
   persist();return fresh;
@@ -1011,7 +1000,7 @@ const isDailyDone=()=>SAVE.daily.date===todayStr()&&SAVE.daily.done;
 const sceneEvents={
   drop(){AU.drop();SAVE.st.drops++;G.tipT=0;},
   hit(imp,pos,label){
-    if(label==='spike'){burst(pos.x,pos.y,14,['#ff6b7d','#fff'],220,0,.6,4,300);vib(40);return;}
+    if(label==='spike'){const bp=G.scene.ball.position;burst(bp.x,bp.y,16,['#f2f4fa','#d9dfee','#bcc6dc'],90,0,1.1,20,-60);burst(bp.x,bp.y,6,['#ffffff'],40,0,.8,26,-40);vib(40);return;}
     if(imp<150)return;const k=clamp(imp/900,0,1);SAVE.st.bounces++;
     if(label==='rubber'||label==='tramp'||label==='bumper'||label==='springplat'){AU.boing(k);burst(pos.x,pos.y,6,['#ffd43b','#ff7eb6'],160,1,.6,6,100);spawnP(pos.x,pos.y,0,0,.4,16,'#ff9ec8',3,0);}
     else{AU.bounce(k);spawnP(pos.x,pos.y,0,0,.35,10,'#8fb4ff',3,0);}
@@ -1056,7 +1045,7 @@ function onWin(){
   for(let i=0;i<5;i++)setTimeout(()=>{if(G.scene===sc)burst(rnd(100,620),rnd(120,300),24,['#ff6b6b','#ffd43b','#69db7c','#4dabf7','#b197fc','#ff7eb6'],320,2,1.8,5,260);},i*220);
   G.pending={type:'win',t:1.1};
 }
-function onFail(r){AU.fail();vib(120);SAVE.st.fails++;persist();G.failReason=r;const b=G.scene.ball.position;burst(clamp(b.x,20,W-20),clamp(b.y,100,H-100),10,['#8fb4ff','#fff'],160,0,.6,5,200);G.pending={type:'fail',t:.9};}
+function onFail(r){AU.fail();vib(120);SAVE.st.fails++;persist();G.failReason=r;const b=G.scene.ball.position;if(r!=='spike')burst(clamp(b.x,20,W-20),clamp(b.y,100,H-100),10,['#8fb4ff','#fff'],160,0,.6,5,200);G.pending={type:'fail',t:.9};}
 function strokeInfo(){const sc=G.scene,d=G.def,used=sc.inkUsed()+(G.drawing?G.drawing.cost:0);let s=3;if(used>d.ink[1])s=1;else if(used>d.ink[2]||G.restarts>0)s=2;return {used,frac:clamp(1-used/d.ink[0],0,1),stars:s};}
 function skipLevel(){if(G.custom||G.testing){go('editor');return;}if(G.lvl<49){SAVE.unlocked=Math.max(SAVE.unlocked,G.lvl+2);persist();startLevel(G.lvl+1);}else go('levels');}
 function giveHint(){const d=G.def;if(!d.sol||!d.sol.length){toast('No hint here','Try your own idea!','bulb');return;}G.hint=7;SAVE.st.hints++;AU.pop();if(G.ov){G.ov=null;if(G.scene.state==='failed')restartLevel();}}
@@ -1094,8 +1083,7 @@ function drawLevels(c){
   for(let w=0;w<5;w++){
     const wd=WORLDS[w],yy=y0+w*372;if(yy>VH||yy+372<118)continue;
     rr(c,24,yy,672,66,24);const g=c.createLinearGradient(0,yy,0,yy+66);g.addColorStop(0,wd.col);g.addColorStop(1,wd.dk);c.fillStyle=g;c.fill();c.lineWidth=4;c.strokeStyle='#fff';c.stroke();
-    T(c,'World '+(w+1)+': '+wd.name,48,yy+34,32,'#fff','left',[wd.dk,6]);let ws=0;for(let i=1;i<=10;i++)ws+=levelStars(w*10+i);
-    ICON.star(c,630,yy+33,17,'#ffe066');T(c,ws+'/30',662,yy+35,24,'#fff','center',[wd.dk,5]);
+    T(c,'World '+(w+1)+': '+wd.name,48,yy+34,32,'#fff','left',[wd.dk,6]);
     for(let i=0;i<10;i++){
       const id=w*10+i+1,col=i%5,row=(i/5)|0,x=37+col*132,y=yy+82+row*140,sz=118,unlocked=id<=SAVE.unlocked||G.devAll,st=levelStars(id);
       if(y>VH||y+sz<118)continue;const key='lv'+id;
@@ -1118,14 +1106,14 @@ function drawChars(c){
   screenBg(c,2);headerBar(c,'Emoji Collection','menu');T(c,SAVE.chars.length+' / 12 collected',360,118,24,'#6b7aa8');
   CHARS.forEach((ch,i)=>{
     const col=i%3,row=(i/3)|0,x=32+col*224,y=140+row*192,w=208,h=176,unlocked=SAVE.chars.includes(ch.id),sel=SAVE.sel===ch.id,key='ch'+ch.id;
-    UI.add(x,y,w,h,()=>{if(unlocked){SAVE.sel=ch.id;persist();AU.pop();}else{AU.pop();toast(ch.name,ch.cond.txt,'lock');}},key,{});
+    UI.add(x,y,w,h,()=>{if(unlocked){SAVE.sel=ch.id;persist();AU.pop();}else if(SAVE.coins>=ch.price){SAVE.coins-=ch.price;SAVE.chars.push(ch.id);SAVE.sel=ch.id;checkProgress();persist();AU.unlock();toast(ch.name,'Bought!','smile');}else{AU.pop();toast('Not enough coins','You need '+ch.price+' coins','lock');}},key,{});
     const down=UI.pressed&&UI.downKey===key;c.save();if(down){c.translate(x+w/2,y+h/2);c.scale(.97,.97);c.translate(-x-w/2,-y-h/2);}
     panel(c,x,y,w,h,{r:26,fill:unlocked?'#fff':'#eef1f7',stroke:sel?'#43c24d':'#cfe3ff'});
     if(sel){c.lineWidth=6;c.strokeStyle='#43c24d';rr(c,x,y,w,h,26);c.stroke();c.fillStyle='#43c24d';c.beginPath();c.arc(x+w-24,y+24,17,0,TAU);c.fill();ICON.check(c,x+w-24,y+24,9,'#fff');}
     if(unlocked){drawEmoji(c,x+w/2,y+72,48,ch.id,sel?'happy':'idle',Math.sin(G.t*2+i)*.1,1,1,G.t+i);T(c,ch.name,x+w/2,y+140,28,'#2b3a67');if(sel)T(c,'Selected',x+w/2,y+162,16,'#2f9e44');}
-    else{c.fillStyle='#c3cce0';c.beginPath();c.arc(x+w/2,y+58,40,0,TAU);c.fill();ICON.lock(c,x+w/2,y+58,22,'#fff');T(c,ch.name,x+w/2,y+112,22,'#8a97bd');
-      const p=charProgress(ch),f=clamp(p[0]/p[1],0,1);rr(c,x+16,y+128,w-32,12,6);c.fillStyle='#dbe3f1';c.fill();if(f>0){rr(c,x+16,y+128,(w-32)*f,12,6);c.fillStyle='#ffb400';c.fill();}
-      wrapText(c,ch.cond.txt,x+w/2,y+155,w-24,16,14,'#6b7aa8');}
+    else{const can=SAVE.coins>=ch.price;c.fillStyle='#c3cce0';c.beginPath();c.arc(x+w/2,y+70,46,0,TAU);c.fill();ICON.lock(c,x+w/2,y+70,28,'#fff');
+      rr(c,x+28,y+132,w-56,34,17);c.fillStyle=can?'#ffd43b':'#dbe3f1';c.fill();c.lineWidth=3;c.strokeStyle=can?'#e0a800':'#c3cce0';c.stroke();
+      ICON.coin(c,x+w/2-34,y+149,13);T(c,String(ch.price),x+w/2+8,y+150,24,can?'#7a5200':'#8a97bd');}
     c.restore();
   });
 }
@@ -1247,10 +1235,11 @@ function flashMsg(text){G.msg={text,t:1.6};}
 function startDraw(x,y){
   const sc=G.scene;if(!sc||sc.state==='won'||sc.state==='failed')return;
   if(strokeInfo().frac<=0){flashMsg('Out of ink!');return;}
-  if(sc.blocked(x,y,THICK[G.thick].v))return;G.drawing={pts:[[x,y]],len:0,cost:0,full:false};
+  if(x<0||x>W||y<-OY||y>H||sc.blocked(x,y,THICK[G.thick].v))return;G.drawing={pts:[[x,y]],len:0,cost:0,full:false};
 }
 function continueDraw(x,y){
   const dr=G.drawing;if(!dr||dr.full)return;const sc=G.scene,tv=THICK[G.thick].v,last=dr.pts[dr.pts.length-1];let dx=x-last[0],dy=y-last[1],d=Math.hypot(dx,dy);
+  if(x<0||x>W||y<-OY||y>H){dr.ghost=null;return;}
   if(d<7){dr.ghost=null;return;}
   const obs=sc.obst();let bad=sc.blocked(x,y,tv,obs);
   if(!bad){const n=Math.ceil(d/6);for(let i=1;i<n;i++)if(sc.blocked(last[0]+dx*i/n,last[1]+dy*i/n,tv,obs)){bad=true;break;}}
@@ -1263,8 +1252,8 @@ function continueDraw(x,y){
   if(Math.random()<.5*gfxK())spawnP(x,y,rnd(-30,30),rnd(-60,-10),.4,3,PEN[G.pen].hi,1,100);
 }
 function endDraw(){
-  const dr=G.drawing;G.drawing=null;const sc=G.scene;if(!dr||!sc||dr.pts.length<2||dr.len<16)return;if(sc.state==='won'||sc.state==='failed')return;
-  const th=THICK[G.thick].v;if(sc.strokeHitsBall(dr.pts,th)){flashMsg("Don't draw on the emoji!");return;}
+  const dr=G.drawing;G.drawing=null;const sc=G.scene;if(!dr||!sc||dr.pts.length<2||dr.len<6)return;if(sc.state==='won'||sc.state==='failed')return;
+  const th=THICK[G.thick].v;
   const st=sc.addStroke(G.pen,dr.pts,th);if(st){if(sc.state==='ready'&&sc.drop())G.tipT=0;AU.pop();const p=dr.pts[dr.pts.length-1];burst(p[0],p[1],6,[PEN[G.pen].hi,'#fff'],120,1,.5,5,100);}
 }
 function onDown(x,y){
@@ -1316,7 +1305,7 @@ const EDI={isOpen:false,def:null,scene:null,sel:null,drag:null,dirty:false,lastS
     this.isOpen=true;if(!this.def)this.newDef();document.getElementById('ed').style.display='block';resize();this.build();this.rebuild();
   },
   close(){this.isOpen=false;document.getElementById('ed').style.display='none';resize();},
-  newDef(){this.def={name:'My Level',tip:'Draw a line, then press DROP!',world:0,ball:[150,300],target:{type:'bucket',x:600,y:796,s:1},objs:[{t:'grass',x:360,y:875,w:720,h:170}],pens:['fixed','rigid'],sol:[],ink:[1200,800,500]};},
+  newDef(){this.def={name:'My Level',tip:'Draw a line, then lift your finger!',world:0,ball:[150,300],target:{type:'bucket',x:600,y:796,s:1},objs:[{t:'grass',x:360,y:875,w:720,h:170}],pens:['fixed','rigid'],sol:[],ink:[1200,800,500]};},
   build(){
     const d=this.def,ed=document.getElementById('ed');let pal='';
     for(const g in PALETTE)pal+='<div><b>'+g+'</b></div><div class="row pal">'+PALETTE[g].map(t=>'<button draggable="true" data-add="'+t+'">'+t+'</button>').join('')+'</div>';
